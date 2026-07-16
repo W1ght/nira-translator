@@ -36,8 +36,8 @@ export class SelectionController {
   constructor(settings: ExtensionSettings) {
     this.settings = settings;
     this.host = document.createElement('div');
-    this.host.dataset.liuyiRoot = 'selection';
-    this.host.setAttribute('aria-label', '流译划词翻译');
+    this.host.dataset.niraRoot = 'selection';
+    this.host.setAttribute('aria-label', 'Nira translator 划词翻译');
 
     const shadowRoot = this.host.attachShadow({ mode: 'open' });
     const style = document.createElement('style');
@@ -220,7 +220,7 @@ function readSelection(): SelectionSnapshot | null {
   const range = selection.getRangeAt(0);
   const ancestor = range.commonAncestorContainer;
   const ancestorElement = ancestor instanceof Element ? ancestor : ancestor.parentElement;
-  if (ancestorElement?.closest('[data-liuyi-root], input, textarea, [contenteditable="true"]')) return null;
+  if (ancestorElement?.closest('[data-nira-root], input, textarea, [contenteditable="true"]')) return null;
 
   let rect = range.getBoundingClientRect();
   if (rect.width === 0 && rect.height === 0) {
@@ -271,7 +271,7 @@ function resolveTheme(theme: ThemeMode, prefersDark: boolean): 'light' | 'dark' 
 
 function userFacingError(payload: TranslationErrorPayload | undefined, fallback: string): string {
   if (!payload) return fallback || '翻译失败，请稍后重试';
-  if (payload.code === 'NO_PROFILE') return '请先在流译设置中选择并配置模型。';
+  if (payload.code === 'NO_PROFILE') return '请先在 Nira translator 设置中选择并配置翻译服务。';
   if (payload.code === 'AUTH_FAILED') return 'API Key 无效，请检查模型配置。';
   if (payload.code === 'RATE_LIMITED') return '请求过于频繁，请稍后重试。';
   if (payload.code === 'PERMISSION_DENIED') return '尚未授权访问该 API 地址。';

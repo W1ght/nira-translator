@@ -48,7 +48,7 @@ function statusLabel(report) {
 
 function reportText(report) {
   return [
-    '流译 DeepSeek 诊断报告',
+    'Nira translator DeepSeek 诊断报告',
     `模式: ${report.mode}`,
     `请求: ${report.endpoint}`,
     `代理: ${report.proxyMode}`,
@@ -85,10 +85,10 @@ function render(report) {
 }
 
 async function run(mode) {
-  localStorage.setItem('liuyi-diagnostic-base-url', value('base-url'));
-  localStorage.setItem('liuyi-diagnostic-model', value('model'));
-  localStorage.setItem('liuyi-diagnostic-proxy-mode', proxyMode.value);
-  localStorage.setItem('liuyi-diagnostic-proxy-url', value('proxy-url'));
+  localStorage.setItem('nira-diagnostic-base-url', value('base-url'));
+  localStorage.setItem('nira-diagnostic-model', value('model'));
+  localStorage.setItem('nira-diagnostic-proxy-mode', proxyMode.value);
+  localStorage.setItem('nira-diagnostic-proxy-url', value('proxy-url'));
   setBusy(true, mode);
 
   try {
@@ -129,8 +129,8 @@ copyButton.addEventListener('click', async () => {
   setTimeout(() => { copyButton.textContent = original; }, 1200);
 });
 
-document.querySelector('#base-url').value = localStorage.getItem('liuyi-diagnostic-base-url') || 'https://api.deepseek.com';
-document.querySelector('#model').value = localStorage.getItem('liuyi-diagnostic-model') || 'deepseek-v4-flash';
-proxyMode.value = localStorage.getItem('liuyi-diagnostic-proxy-mode') || 'system';
-document.querySelector('#proxy-url').value = localStorage.getItem('liuyi-diagnostic-proxy-url') || '';
+document.querySelector('#base-url').value = localStorage.getItem('nira-diagnostic-base-url') || 'https://api.deepseek.com';
+document.querySelector('#model').value = localStorage.getItem('nira-diagnostic-model') || 'deepseek-v4-flash';
+proxyMode.value = localStorage.getItem('nira-diagnostic-proxy-mode') || 'system';
+document.querySelector('#proxy-url').value = localStorage.getItem('nira-diagnostic-proxy-url') || '';
 proxyMode.dispatchEvent(new Event('change'));

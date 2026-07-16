@@ -1,4 +1,4 @@
-# 流译（Liuyi Translator）
+# Nira translator
 
 一个面向 Chrome 与 Edge 的 Manifest V3 大模型网页翻译扩展。支持页面按视口翻译、划词翻译、多模型配置、深浅主题和可编辑 Prompt。
 
@@ -106,7 +106,9 @@ src/
 
 ## DeepSeek 连接排查
 
-如果扩展提示 `ERR_BLOCKED_BY_CLIENT`，说明请求尚未到达 DeepSeek，Chrome 已在客户端拦截 `api.deepseek.com`。请直接在 Chrome 打开 `https://api.deepseek.com/models`：正常连通时会收到 DeepSeek 的 JSON 鉴权错误；如果浏览器显示“已被屏蔽”，请在广告过滤、隐私、安全、代理或其他翻译扩展中将 `api.deepseek.com` 加入白名单，然后重新加载网页。
+保存配置或点击“测试连接”时，Nira translator 会检查对应 API 域名的 Chrome 主机权限；权限被设为“点击时”或曾被收回时，会直接弹出授权请求。翻译前后台还会再次校验权限，避免把缺少权限误报成网络故障。
+
+如果权限已授权但控制台仍显示 `ERR_BLOCKED_BY_CLIENT`，说明请求尚未到达 DeepSeek，通常是其他广告过滤、隐私、安全或代理扩展拦截了 `api.deepseek.com`。请直接在 Chrome 打开 `https://api.deepseek.com/models`：正常连通时会收到 DeepSeek 的 JSON 鉴权错误；如果浏览器显示“已被屏蔽”，请在相关扩展中将 `api.deepseek.com` 加入白名单，然后重新加载网页。
 
 仓库同时提供 `desktop-tester/` Tauri 2 原生诊断器源码。它使用 Rust 直接测试 DNS、TLS、系统代理和 DeepSeek HTTP/API 请求，不经过 Chrome 扩展或 WebView `fetch`。Windows 可执行文件和安装包仅在本地构建，不上传 GitHub Release。
 

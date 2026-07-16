@@ -1,12 +1,12 @@
 [package]
-name = "liuyi-deepseek-diagnostic"
-version = "0.1.5"
-description = "Native DeepSeek connectivity tester for Liuyi Translator"
+name = "nira-deepseek-diagnostic"
+version = "0.2.0"
+description = "Native DeepSeek connectivity tester for Nira translator"
 authors = ["W1ght"]
 edition = "2021"
 
 [lib]
-name = "liuyi_deepseek_diagnostic_lib"
+name = "nira_deepseek_diagnostic_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

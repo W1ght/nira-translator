@@ -63,10 +63,10 @@ export function SelectionOverlay({
   };
 
   return (
-    <div className="liuyi-overlay" data-theme={theme}>
+    <div className="nira-overlay" data-theme={theme}>
       {showTrigger && panel.status === 'closed' ? (
         <button
-          className="liuyi-trigger"
+          className="nira-trigger"
           style={triggerStyle}
           type="button"
           aria-label="翻译选中文本"
@@ -80,22 +80,20 @@ export function SelectionOverlay({
 
       {panel.status !== 'closed' ? (
         <section
-          className={`liuyi-panel liuyi-panel--${panel.status}`}
+          className={`nira-panel nira-panel--${panel.status}`}
           style={panelStyle}
           aria-live="polite"
           aria-busy={panel.status === 'loading'}
           aria-label="划词翻译"
         >
-          <div className="liuyi-glow" aria-hidden="true" />
-          <header className="liuyi-header">
-            <div className="liuyi-brand" aria-label="流译">
-              <span className="liuyi-brand-mark" aria-hidden="true">译</span>
-              <span>流译</span>
+          <header className="nira-header">
+            <div className="nira-brand" aria-label="Nira translator">
+              <span>Nira translator</span>
             </div>
-            <div className="liuyi-header-actions">
-              <span className="liuyi-language">{targetLanguageLabel}</span>
+            <div className="nira-header-actions">
+              <span className="nira-language">{targetLanguageLabel}</span>
               <button
-                className="liuyi-icon-button"
+                className="nira-icon-button"
                 type="button"
                 aria-label="关闭翻译"
                 title="关闭"
@@ -107,7 +105,7 @@ export function SelectionOverlay({
           </header>
 
           {panel.status === 'loading' ? (
-            <div className="liuyi-loading" aria-label="正在翻译">
+            <div className="nira-loading" aria-label="正在翻译">
               <span />
               <span />
               <span />
@@ -115,14 +113,14 @@ export function SelectionOverlay({
           ) : null}
 
           {panel.status === 'result' ? (
-            <div className="liuyi-content">
-              <p className="liuyi-result">{panel.text}</p>
-              <div className="liuyi-result-actions">
-                <button className="liuyi-action-button" type="button" onClick={copyResult}>
+            <div className="nira-content">
+              <p className="nira-result">{panel.text}</p>
+              <div className="nira-result-actions">
+                <button className="nira-action-button" type="button" onClick={copyResult}>
                   <span aria-hidden="true">□</span>
                   {copied ? '已复制' : '复制'}
                 </button>
-                <button className="liuyi-action-button" type="button" onClick={onRetry}>
+                <button className="nira-action-button" type="button" onClick={onRetry}>
                   <span aria-hidden="true">↻</span>
                   重新翻译
                 </button>
@@ -131,9 +129,9 @@ export function SelectionOverlay({
           ) : null}
 
           {panel.status === 'error' ? (
-            <div className="liuyi-content liuyi-error">
+            <div className="nira-content nira-error">
               <p>{panel.message}</p>
-              <button className="liuyi-primary-button" type="button" onClick={onRetry}>
+              <button className="nira-primary-button" type="button" onClick={onRetry}>
                 重试
               </button>
             </div>

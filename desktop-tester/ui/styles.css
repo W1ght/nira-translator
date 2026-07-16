@@ -22,12 +22,6 @@ button, input, select, textarea { font: inherit; }
 .shell { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 42px 0 24px; }
 
 .hero { display: flex; align-items: center; gap: 18px; margin-bottom: 28px; }
-.hero .logo {
-  display: grid; place-items: center; width: 56px; height: 56px; border-radius: 17px;
-  color: white; font-size: 25px; font-weight: 800;
-  background: linear-gradient(145deg, #35d7ca, #0c8f91);
-  box-shadow: 0 0 32px rgba(41, 215, 200, 0.32);
-}
 .hero h1 { margin: 2px 0 5px; font-size: 28px; letter-spacing: -0.03em; }
 .hero p { margin: 0; color: #8e9aa5; }
 .eyebrow { color: #44d6ca !important; font-size: 10px; font-weight: 800; letter-spacing: .18em; }

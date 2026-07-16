@@ -6,11 +6,14 @@ import {
   parseTranslationResponse,
 } from '../src/core/prompts';
 import { normalizeProviderError, requestProviderText } from '../src/core/providers';
+import { requestDirectTranslations } from '../src/core/direct-providers';
+import { isAiProtocol, profileIsReady, PROVIDER_CATALOG } from '../src/constants/providers';
 import { isTrustedExtensionPage } from '../src/core/runtime-auth';
 import {
   createTranslationCacheKey,
   SessionLruCache,
 } from '../src/core/session-cache';
+import { hasProviderOriginAccess } from '../src/core/provider-permission';
 import {
   deleteProfile,
   getProfile,
@@ -23,7 +26,6 @@ import {
   updatePrompts,
   updateSettings,
 } from '../src/core/storage';
-import { getProviderOriginPattern } from '../src/core/url';
 import type {
   ExtensionSettings,
   PromptTemplate,
@@ -47,7 +49,6 @@ interface RuntimeMessage {
   prompts?: PromptTemplate;
   profile?: ModelProfileInput;
   profileId?: string;
-  baseUrl?: string;
   request?: TranslationRequest;
   jobId?: string;
 }
@@ -133,13 +134,6 @@ async function handleMessage(raw: unknown, sender: MessageSenderLike): Promise<u
         if (!message.profileId) throw createTranslationError('INVALID_PROFILE', '缺少配置 ID', false);
         return { ok: true, ...(await testProfile(message.profileId)) };
       }
-      case 'permissions:request-api': {
-        assertExtensionPage(sender);
-        if (!message.baseUrl) throw createTranslationError('INVALID_PROFILE', '缺少 API 地址', false);
-        const origin = getProviderOriginPattern(message.baseUrl);
-        const granted = await browser.permissions.request({ origins: [origin] });
-        return { ok: true, granted };
-      }
       case 'translate':
         assertContentScript(sender);
         if (!isTranslationRequest(message.request)) {
@@ -172,10 +166,10 @@ async function translate(
     getPrompts(),
   ]);
   if (!profile) throw createTranslationError('NO_PROFILE', '请先选择模型配置', false);
-  if (!profile.apiKey) {
+  if (!profileIsReady(profile)) {
     throw createTranslationError(
       'INVALID_PROFILE',
-      '当前模型没有保存 API Key。请在设置中输入密钥并点击“保存配置”',
+      '当前翻译服务配置不完整，请在设置中补齐必填项并保存',
       false,
     );
   }
@@ -199,6 +193,8 @@ async function translate(
       cached: true,
     };
   }
+
+  await assertProviderOriginAccess(profile.baseUrl);
 
   const controller = new AbortController();
   const key = jobKey(sender, request.jobId);
@@ -254,6 +250,15 @@ async function performProviderTranslation(
   profile: NonNullable<Awaited<ReturnType<typeof getProfile>>>,
   signal: AbortSignal,
 ): Promise<TranslationSegment[]> {
+  if (!isAiProtocol(profile.protocol)) {
+    return requestDirectTranslations({
+      profile,
+      sourceLanguage: request.sourceLanguage,
+      targetLanguage: request.targetLanguage,
+      segments: request.segments,
+      signal,
+    });
+  }
   const built = buildTranslationPrompt(prompts, request);
   const response = await requestProviderText({
     profile,
@@ -271,7 +276,21 @@ async function testProfile(profileId: string): Promise<{
 }> {
   const profile = await getProfile(profileId);
   if (!profile) throw createTranslationError('NO_PROFILE', '找不到模型配置', false);
+  await assertProviderOriginAccess(profile.baseUrl);
   const startedAt = performance.now();
+  if (!isAiProtocol(profile.protocol)) {
+    const result = await requestDirectTranslations({
+      profile,
+      sourceLanguage: profile.protocol === 'builtin-translator' ? 'en' : 'auto',
+      targetLanguage: 'zh-CN',
+      segments: [{ id: 'test', text: 'hello' }],
+    });
+    return {
+      durationMs: Math.round(performance.now() - startedAt),
+      output: result[0]?.text.slice(0, 120) ?? '',
+      actualModel: profile.name,
+    };
+  }
   const output = await requestProviderText({
     profile,
     systemPrompt: 'You are a translation API connection test. Return only the translation.',
@@ -280,8 +299,19 @@ async function testProfile(profileId: string): Promise<{
   return {
     durationMs: Math.round(performance.now() - startedAt),
     output: output.slice(0, 120),
-    actualModel: profile.model,
+    actualModel: profile.model || profile.name,
   };
+}
+
+async function assertProviderOriginAccess(baseUrl: string): Promise<void> {
+  if (baseUrl === 'https://localhost') return;
+  if (await hasProviderOriginAccess(browser.permissions, baseUrl)) return;
+  const hostname = new URL(baseUrl).hostname;
+  throw createTranslationError(
+    'PERMISSION_DENIED',
+    `Chrome 尚未授权扩展访问 ${hostname}。请打开 Nira translator 设置，在翻译服务中点击“测试连接”并允许访问`,
+    false,
+  );
 }
 
 function validateTranslationLimits(request: TranslationRequest): void {
@@ -340,10 +370,11 @@ function isProfileInput(value: unknown): value is ModelProfileInput {
   const profile = value as Partial<ModelProfileInput>;
   return typeof profile.id === 'string'
     && typeof profile.name === 'string'
-    && ['openai', 'deepseek', 'custom'].includes(profile.preset ?? '')
-    && ['openai-chat', 'anthropic-messages'].includes(profile.protocol ?? '')
+    && PROVIDER_CATALOG.some((provider) => provider.preset === profile.preset)
+    && PROVIDER_CATALOG.some((provider) => provider.protocol === profile.protocol)
     && typeof profile.baseUrl === 'string'
     && typeof profile.model === 'string'
+    && (profile.region === undefined || typeof profile.region === 'string')
     && ['keep', 'replace', 'clear'].includes(profile.credentialAction ?? '');
 }
 
@@ -391,4 +422,3 @@ async function handleCommand(command: string): Promise<void> {
 function failure(code: 'INVALID_PROFILE' | 'PERMISSION_DENIED', message: string) {
   return { ok: false, error: { code, message, retryable: false } };
 }
-

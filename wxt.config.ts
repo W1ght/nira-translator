@@ -8,9 +8,9 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   manifest: {
-    name: '流译 - LLM 网页翻译',
-    short_name: '流译',
-    description: '使用你自己的 OpenAI 或 DeepSeek API 翻译网页与划词内容。',
+    name: 'Nira translator',
+    short_name: 'Nira translator',
+    description: '使用多种翻译服务与 AI 模型翻译网页和划词内容。',
     icons: {
       16: 'icons/16.png',
       32: 'icons/32.png',

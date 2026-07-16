@@ -1,6 +1,6 @@
 import type { ProviderProtocol } from '../types/domain';
 
-const ENDPOINT_PATHS: Record<ProviderProtocol, string> = {
+const ENDPOINT_PATHS: Partial<Record<ProviderProtocol, string>> = {
   'openai-chat': 'chat/completions',
   'anthropic-messages': 'v1/messages',
 };
@@ -75,6 +75,7 @@ export function buildProviderEndpoint(
 ): string {
   const url = validateProviderBaseUrl(baseUrl, options);
   const suffix = ENDPOINT_PATHS[protocol];
+  if (!suffix) return url.toString();
   const path = url.pathname.replace(/\/+$/g, '');
   const normalizedPath = path.toLowerCase();
   const normalizedSuffix = `/${suffix}`.toLowerCase();

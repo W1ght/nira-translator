@@ -6,7 +6,7 @@ import type {
 import { createTranslationError } from './errors';
 
 const NONCE_PATTERN = /^[a-f0-9]{32}$/;
-const ANY_PROTOCOL_MARKER = '<<<LIUYI:';
+const ANY_PROTOCOL_MARKER = '<<<NIRA:';
 
 export interface PromptVariables {
   sourceLanguage: string;
@@ -28,7 +28,7 @@ export interface BuiltTranslationPrompt {
 }
 
 function marker(nonce: string, index: number, boundary: 'BEGIN' | 'END'): string {
-  return `<<<LIUYI:${nonce}:SEGMENT:${index}:${boundary}>>>`;
+  return `<<<NIRA:${nonce}:SEGMENT:${index}:${boundary}>>>`;
 }
 
 function assertNonce(nonce: string): void {

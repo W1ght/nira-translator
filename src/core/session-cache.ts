@@ -97,7 +97,7 @@ export class SessionLruCache<T> {
     private readonly storage: SessionStorageAreaLike,
     options: SessionLruCacheOptions = {},
   ) {
-    const namespace = options.namespace ?? 'liuyi:translation-cache';
+    const namespace = options.namespace ?? 'nira:translation-cache';
     this.indexKey = `${namespace}:index`;
     this.itemPrefix = `${namespace}:item:`;
     this.maxEntries = Math.max(1, Math.floor(options.maxEntries ?? 500));

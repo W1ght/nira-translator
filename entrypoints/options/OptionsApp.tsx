@@ -11,7 +11,6 @@ import {
   ShieldKey,
   Shortcuts,
   TextPrompt,
-  Translate,
   Trash,
   WebsiteNetwork,
 } from '@openai/apps-sdk-ui/components/Icon';
@@ -24,8 +23,9 @@ import { type ComponentType, type SVGProps, useEffect, useMemo, useState } from 
 import { browser } from 'wxt/browser';
 
 import { DEFAULT_PROMPTS, DEFAULT_SETTINGS } from '../../src/constants/defaults';
+import { getProviderDefinition, profileIsReady, PROVIDER_CATALOG } from '../../src/constants/providers';
 import { LANGUAGES } from '../../src/constants/languages';
-import { getProviderOriginPattern } from '../../src/core/url';
+import { ensureProviderOriginAccess } from '../../src/core/provider-permission';
 import type {
   ExtensionSettings,
   PromptTemplate,
@@ -43,7 +43,7 @@ type SectionId = 'models' | 'page' | 'selection' | 'prompts' | 'appearance' | 's
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 const NAV_ITEMS: Array<{ id: SectionId; label: string; Icon: IconComponent }> = [
-  { id: 'models', label: '模型服务', Icon: ApiKey },
+  { id: 'models', label: '翻译服务', Icon: ApiKey },
   { id: 'page', label: '页面翻译', Icon: WebsiteNetwork },
   { id: 'selection', label: '划词翻译', Icon: SelectText },
   { id: 'prompts', label: 'Prompt 模板', Icon: TextPrompt },
@@ -59,6 +59,24 @@ const SOURCE_LANGUAGES: Option[] = LANGUAGES.map((language) => ({
   label: language.label,
 }));
 
+const PROTOCOL_LABELS: Record<ProviderProtocol, string> = {
+  'openai-chat': 'OpenAI Chat Completions',
+  'anthropic-messages': 'Anthropic Messages',
+  'gemini-generate': 'Gemini generateContent',
+  'builtin-translator': 'Chrome Translator API',
+  'google-translate': 'Google Translate',
+  'google-html': 'Google Translate HTML',
+  'microsoft-translator': 'Microsoft Translator',
+  'azure-translator': 'Azure AI Translator',
+  deepl: 'DeepL API',
+  'deepl-free': 'DeepL JSON-RPC',
+  deeplx: 'DeepLX',
+  'tencent-translator': 'Tencent Transmart',
+  'volcengine-translator': 'Volcengine Translate',
+  'cloudflare-ai': 'Cloudflare Workers AI',
+  'custom-json': '自定义 JSON',
+};
+
 const newCustomProfile = (): ModelProfileInput => ({
   id: `custom-${crypto.randomUUID()}`,
   name: '自定义模型',
@@ -66,6 +84,7 @@ const newCustomProfile = (): ModelProfileInput => ({
   protocol: 'openai-chat',
   baseUrl: 'https://',
   model: '',
+  region: '',
   temperature: null,
   maxOutputTokens: 4096,
   timeoutMs: 27_000,
@@ -135,6 +154,7 @@ function profileToInput(profile: PublicModelProfile): ModelProfileInput {
     protocol: profile.protocol,
     baseUrl: profile.baseUrl,
     model: profile.model,
+    region: profile.region ?? '',
     temperature: profile.temperature,
     maxOutputTokens: profile.maxOutputTokens,
     timeoutMs: profile.timeoutMs,
@@ -146,7 +166,7 @@ function SectionHeader({ title, description }: { title: string; description: str
   return (
     <header className="mb-7">
       <h2 className="text-xl font-semibold tracking-[-0.02em]">{title}</h2>
-      <p className="mt-1.5 max-w-2xl text-sm leading-6 text-[var(--liuyi-muted)]">{description}</p>
+      <p className="mt-1.5 max-w-2xl text-sm leading-6 text-[var(--nira-muted)]">{description}</p>
     </header>
   );
 }
@@ -161,10 +181,10 @@ function SettingRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-8 border-b border-[var(--liuyi-border)] py-5 last:border-0">
+    <div className="flex items-center justify-between gap-8 border-b border-[var(--nira-border)] py-5 last:border-0">
       <div className="max-w-lg">
         <h3 className="text-sm font-medium">{title}</h3>
-        <p className="mt-1 text-xs leading-5 text-[var(--liuyi-muted)]">{description}</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--nira-muted)]">{description}</p>
       </div>
       <div className="w-[260px] shrink-0">{children}</div>
     </div>
@@ -221,6 +241,10 @@ export function OptionsApp() {
     draft.credentialAction,
     Boolean(selectedProfile?.hasApiKey),
   );
+  const providerDefinition = getProviderDefinition(draft.preset);
+  const draftReady = (!providerDefinition.requiresApiKey || credentialState !== 'missing')
+    && (!providerDefinition.requiresModel || Boolean(draft.model.trim()))
+    && (!providerDefinition.supportsRegion || Boolean(draft.region?.trim()));
 
   const updateSettings = async (patch: Partial<ExtensionSettings>) => {
     setStatus(null);
@@ -243,12 +267,13 @@ export function OptionsApp() {
     setStatus(null);
   };
 
-  const validateCustomOrigin = async () => {
-    if (draft.preset !== 'custom') return;
-    const originPattern = getProviderOriginPattern(draft.baseUrl);
-    const granted = await browser.permissions.contains({ origins: [originPattern] });
+  const requestProviderAccess = async () => {
+    if (isBrowserPreview()) return;
+    if (draft.protocol === 'builtin-translator') return;
+    const granted = await ensureProviderOriginAccess(browser.permissions, draft.baseUrl);
     if (!granted) {
-      throw new Error('扩展尚未获得该 API 地址的访问权限，请重新加载扩展并允许访问网站数据');
+      const hostname = new URL(draft.baseUrl).hostname;
+      throw new Error(`Chrome 未授权访问 ${hostname}。请允许该域名后再保存或测试连接`);
     }
   };
 
@@ -257,7 +282,9 @@ export function OptionsApp() {
     setTesting(runTest);
     setStatus(null);
     try {
-      await validateCustomOrigin();
+      // Keep the permission request as the first awaited browser operation so
+      // Chrome can associate its prompt with the Save/Test button gesture.
+      await requestProviderAccess();
       const normalizedCredential = credential.trim();
       const payload: ModelProfileInput = {
         ...draft,
@@ -265,8 +292,9 @@ export function OptionsApp() {
         ...(normalizedCredential ? { apiKey: normalizedCredential } : {}),
       };
       if (!payload.name.trim()) throw new Error('请填写配置名称');
-      if (!payload.model.trim()) throw new Error('请填写模型名称');
-      if (credentialState === 'missing') {
+      if (providerDefinition.requiresModel && !payload.model.trim()) throw new Error('请填写模型名称');
+      if (providerDefinition.supportsRegion && !payload.region?.trim()) throw new Error('请填写 Azure 区域');
+      if (providerDefinition.requiresApiKey && credentialState === 'missing') {
         throw new Error('请输入 API Key；看到“已保存”标记后模型才可用于翻译');
       }
       const saved = await request<{ profiles: PublicModelProfile[]; settings: ExtensionSettings }>({
@@ -355,16 +383,11 @@ export function OptionsApp() {
   })), [profiles, settings.activeProfileId]);
 
   return (
-    <div className="min-h-screen bg-[var(--liuyi-page)] text-[var(--liuyi-text)]">
-      <aside className="fixed inset-y-0 left-0 flex w-[244px] flex-col border-r border-[var(--liuyi-border)] bg-[var(--liuyi-sidebar)] px-4 py-5">
-        <div className="mb-8 flex items-center gap-3 px-2">
-          <div className="grid size-10 place-items-center rounded-xl bg-[var(--liuyi-accent)] text-white shadow-[0_8px_24px_rgb(15_143_134/0.18)]">
-            <Translate className="size-5" />
-          </div>
-          <div>
-            <h1 className="text-[15px] font-semibold">流译</h1>
-            <p className="text-[11px] text-[var(--liuyi-muted)]">设置与模型管理</p>
-          </div>
+    <div className="nira-shell min-h-screen bg-[var(--nira-page)] text-[var(--nira-text)]">
+      <aside className="nira-sidebar fixed inset-y-0 left-0 flex w-[232px] flex-col border-r border-[var(--nira-border)] bg-[var(--nira-sidebar)] px-4 py-6">
+        <div className="mb-8 px-2">
+          <h1 className="text-[17px] font-semibold tracking-[-0.02em]">Nira translator</h1>
+          <p className="mt-1 text-[11px] text-[var(--nira-muted)]">网页与划词翻译</p>
         </div>
 
         <nav className="space-y-1">
@@ -374,8 +397,8 @@ export function OptionsApp() {
               type="button"
               className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
                 section === id
-                  ? 'bg-[var(--liuyi-surface)] font-medium text-[var(--liuyi-text)] shadow-[0_1px_2px_rgb(0_0_0/0.05)]'
-                  : 'text-[var(--liuyi-muted)] hover:bg-[var(--liuyi-surface)] hover:text-[var(--liuyi-text)]'
+                  ? 'bg-[var(--nira-surface)] font-medium text-[var(--nira-text)] shadow-[0_1px_2px_rgb(0_0_0/0.05)]'
+                  : 'text-[var(--nira-muted)] hover:bg-[var(--nira-surface)] hover:text-[var(--nira-text)]'
               }`}
               onClick={() => { setSection(id); setStatus(null); }}
             >
@@ -385,29 +408,29 @@ export function OptionsApp() {
           ))}
         </nav>
 
-        <div className="mt-auto rounded-xl border border-[var(--liuyi-border)] bg-[var(--liuyi-surface)] p-3">
+        <div className="mt-auto border-t border-[var(--nira-border)] px-2 pt-4">
           <div className="flex items-center gap-2 text-xs font-medium">
-            <ShieldKey className="size-4 text-[var(--liuyi-accent)]" />
+            <ShieldKey className="size-4" />
             BYOK 本地配置
           </div>
-          <p className="mt-1.5 text-[10px] leading-4 text-[var(--liuyi-muted)]">
+          <p className="mt-1.5 text-[10px] leading-4 text-[var(--nira-muted)]">
             密钥存于浏览器本地，不会返回给网页脚本。
           </p>
         </div>
       </aside>
 
-      <main className="ml-[244px] min-h-screen">
-        <div className="mx-auto max-w-[980px] px-10 py-10">
+      <main className="nira-main ml-[232px] min-h-screen">
+        <div className="nira-content mx-auto max-w-[1220px] px-12 py-10">
           {section === 'models' && (
             <>
               <SectionHeader
-                title="模型服务"
-                description="DeepSeek 默认使用官方 OpenAI 兼容接口，也可切换到 Anthropic / Claude 兼容格式；两者调用的都是 DeepSeek 模型。"
+                title="翻译服务"
+                description="连接你常用的翻译与大模型服务。支持 KISS Translator 的全部内置服务类型。"
               />
-              <div className="grid grid-cols-[260px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-[var(--liuyi-border)] bg-[var(--liuyi-surface)]">
-                <div className="border-r border-[var(--liuyi-border)] bg-[var(--liuyi-sidebar)] p-3">
+              <div className="nira-service-layout grid min-h-[720px] grid-cols-[minmax(420px,1fr)_470px] overflow-hidden border-y border-[var(--nira-border)] bg-[var(--nira-surface)]">
+                <div className="border-r border-[var(--nira-border)] py-3 pr-4">
                   <div className="mb-2 flex items-center justify-between px-1">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--liuyi-muted)]">配置</span>
+                    <span className="text-[11px] font-medium text-[var(--nira-muted)]">服务 · {profileList.length}</span>
                     <Button
                       color="secondary"
                       variant="ghost"
@@ -425,30 +448,39 @@ export function OptionsApp() {
                       <Plus className="size-3.5" />
                     </Button>
                   </div>
-                  <div className="space-y-1">
+                  <div className="max-h-[656px] overflow-y-auto border-t border-[var(--nira-border)]">
                     {profileList.map((profile) => (
                       <button
                         key={profile.id}
                         type="button"
-                        className={`w-full rounded-xl px-3 py-2.5 text-left ${selectedId === profile.id ? 'bg-[var(--liuyi-surface)] shadow-[0_1px_2px_rgb(0_0_0/0.06)]' : 'hover:bg-[var(--liuyi-surface)]'}`}
+                        className={`relative grid w-full grid-cols-[minmax(0,1fr)_90px_18px] items-center gap-3 border-b border-[var(--nira-border)] px-4 py-3 text-left transition-colors ${selectedId === profile.id ? 'bg-[var(--nira-selected)] before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-[var(--nira-text)]' : 'hover:bg-[var(--nira-selected)]'}`}
                         onClick={() => selectProfile(profile)}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="truncate text-sm font-medium">{profile.name}</span>
-                          {profile.active && <span className="size-1.5 shrink-0 rounded-full bg-emerald-500" />}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm font-medium">{profile.name}</span>
+                            {profile.active && <span className="text-[10px] text-[var(--nira-muted)]">当前</span>}
+                          </div>
+                          <p className="mt-1 truncate text-[11px] text-[var(--nira-muted)]">{getProviderDefinition(profile.preset).description}</p>
                         </div>
-                        <p className={`mt-1 truncate text-[11px] ${profile.hasApiKey ? 'text-[var(--liuyi-muted)]' : 'text-amber-500'}`}>
-                          {profile.hasApiKey ? (profile.model || '未填写模型') : `${profile.model || '未填写模型'} · 未配置 Key`}
-                        </p>
+                        <span className="text-right text-[11px] text-[var(--nira-muted)]">{profileIsReady(profile) ? '已连接' : '未配置'}</span>
+                        <span aria-hidden className="text-base text-[var(--nira-muted)]">›</span>
                       </button>
                     ))}
                     {!profileList.length && (
-                      <p className="px-3 py-8 text-center text-xs text-[var(--liuyi-muted)]">还没有配置</p>
+                      <p className="px-3 py-8 text-center text-xs text-[var(--nira-muted)]">还没有配置</p>
                     )}
                   </div>
                 </div>
 
-                <div className="p-6">
+                <div className="p-8">
+                  <div className="mb-7 flex items-start justify-between gap-4 border-b border-[var(--nira-border)] pb-5">
+                    <div>
+                      <h3 className="text-xl font-semibold tracking-[-0.02em]">{draft.name || '新服务'}</h3>
+                      <p className="mt-1 text-xs text-[var(--nira-muted)]">{providerDefinition.description}</p>
+                    </div>
+                    <span className="text-xs text-[var(--nira-muted)]">{draftReady ? '已就绪' : '需要配置'}</span>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <label className="col-span-2">
                       <span className="mb-1.5 block text-xs font-medium">配置名称</span>
@@ -458,90 +490,71 @@ export function OptionsApp() {
                       <span className="mb-1.5 block text-xs font-medium">服务商</span>
                       <Select
                         value={draft.preset}
-                        options={[
-                          { value: 'openai', label: 'OpenAI' },
-                          { value: 'deepseek', label: 'DeepSeek' },
-                          { value: 'custom', label: '自定义' },
-                        ]}
+                        options={PROVIDER_CATALOG.map((provider) => ({ value: provider.preset, label: provider.name }))}
                         onChange={(option) => {
                           const preset = option.value as ProviderPreset;
-                          const next = preset === 'openai'
-                            ? { preset, protocol: 'openai-chat' as const, baseUrl: 'https://api.openai.com/v1', name: 'OpenAI' }
-                            : preset === 'deepseek'
-                              ? { preset, protocol: 'openai-chat' as const, baseUrl: 'https://api.deepseek.com', name: 'DeepSeek', model: 'deepseek-v4-flash' }
-                              : { preset, name: draft.name };
+                          const definition = getProviderDefinition(preset);
+                          const next = { preset, protocol: definition.protocol, baseUrl: definition.baseUrl, name: definition.name, model: definition.model, region: '' };
                           setDraft({ ...draft, ...next });
                         }}
                       />
                     </label>
                     <label>
                       <span className="mb-1.5 block text-xs font-medium">接口协议</span>
-                      <Select
-                        value={draft.protocol}
-                        disabled={draft.preset === 'openai'}
-                        options={[
-                          {
-                            value: 'openai-chat',
-                            label: draft.preset === 'deepseek'
-                              ? 'OpenAI Chat Completions（推荐）'
-                              : 'OpenAI Chat Completions',
-                          },
-                          {
-                            value: 'anthropic-messages',
-                            label: draft.preset === 'deepseek'
-                              ? 'Anthropic Messages（兼容）'
-                              : 'Anthropic Messages',
-                          },
-                        ]}
-                        onChange={(option) => {
-                          const protocol = option.value as ProviderProtocol;
-                          const baseUrl = draft.preset === 'deepseek'
-                            ? protocol === 'openai-chat'
-                              ? 'https://api.deepseek.com'
-                              : 'https://api.deepseek.com/anthropic'
-                            : draft.baseUrl;
-                          setDraft({ ...draft, protocol, baseUrl });
-                        }}
-                      />
+                      {draft.preset === 'custom' ? (
+                        <Select
+                          value={draft.protocol}
+                          options={[
+                            { value: 'openai-chat', label: 'OpenAI Chat Completions' },
+                            { value: 'anthropic-messages', label: 'Anthropic Messages' },
+                            { value: 'gemini-generate', label: 'Gemini generateContent' },
+                            { value: 'custom-json', label: '自定义 JSON 批量接口' },
+                          ]}
+                          onChange={(option) => setDraft({ ...draft, protocol: option.value as ProviderProtocol })}
+                        />
+                      ) : (
+                        <div className="flex h-9 items-center rounded-lg border border-[var(--nira-border)] bg-[var(--nira-selected)] px-3 text-xs text-[var(--nira-muted)]">
+                          {PROTOCOL_LABELS[draft.protocol]}
+                        </div>
+                      )}
                     </label>
                     <label className="col-span-2">
                       <span className="mb-1.5 block text-xs font-medium">API 地址</span>
                       <Input
                         value={draft.baseUrl}
-                        disabled={draft.preset !== 'custom'}
+                        disabled={!providerDefinition.editableUrl}
                         onChange={(event) => setDraft({ ...draft, baseUrl: event.target.value })}
                       />
-                      {draft.preset === 'deepseek' && (
-                        <p className="mt-2 text-[10px] leading-4 text-[var(--liuyi-muted)]">
-                          推荐使用官方 OpenAI 格式；Anthropic 格式用于 Claude 生态兼容。
-                        </p>
-                      )}
                     </label>
-                    <label className="col-span-2">
+                    {providerDefinition.requiresModel && <label className="col-span-2">
                       <span className="mb-1.5 block text-xs font-medium">模型名称</span>
                       <Input
                         value={draft.model}
                         placeholder={draft.preset === 'deepseek' ? 'deepseek-v4-flash' : '填写可用模型 ID'}
                         onChange={(event) => setDraft({ ...draft, model: event.target.value })}
                       />
-                    </label>
-                    <label className="col-span-2">
+                    </label>}
+                    {providerDefinition.supportsRegion && <label className="col-span-2">
+                      <span className="mb-1.5 block text-xs font-medium">Azure 区域</span>
+                      <Input value={draft.region ?? ''} placeholder="例如 eastasia" onChange={(event) => setDraft({ ...draft, region: event.target.value })} />
+                    </label>}
+                    {providerDefinition.requiresApiKey && <label className="col-span-2">
                       <span className="mb-1.5 flex items-center justify-between text-xs font-medium">
                         <span>API Key</span>
                         <span className="flex items-center gap-2">
                           <span className={`text-[11px] font-normal ${
                             credentialState === 'stored'
-                              ? 'text-emerald-500'
+                              ? 'text-[var(--nira-text)]'
                               : credentialState === 'pending'
-                                ? 'text-amber-500'
-                                : 'text-red-500'
+                                ? 'text-[var(--nira-muted)]'
+                                : 'text-[var(--nira-muted)]'
                           }`}>
                             {credentialState === 'stored' ? '已保存' : credentialState === 'pending' ? '待保存' : '未保存'}
                           </span>
                           {credentialState === 'stored' && (
                             <button
                               type="button"
-                              className="text-[11px] font-normal text-red-500 hover:underline"
+                            className="text-[11px] font-normal text-[var(--nira-muted)] hover:underline"
                               onClick={() => { setCredential(''); setDraft({ ...draft, credentialAction: 'clear' }); }}
                             >
                               清除
@@ -561,25 +574,25 @@ export function OptionsApp() {
                           setDraft({ ...draft, credentialAction: event.target.value ? 'replace' : 'keep' });
                         }}
                       />
-                      <p className="mt-2 text-[10px] leading-4 text-[var(--liuyi-muted)]">
+                      <p className="mt-2 text-[10px] leading-4 text-[var(--nira-muted)]">
                         浏览器扩展无法安全地保管长期生产密钥。建议使用专用项目 Key、设置消费限额并定期轮换。
                       </p>
-                    </label>
+                    </label>}
                   </div>
 
-                  <div className="mt-6 flex items-center justify-between border-t border-[var(--liuyi-border)] pt-5">
+                  <div className="mt-6 flex items-center justify-between border-t border-[var(--nira-border)] pt-5">
                     <div>
                       {selectedProfile && (
-                        <Button color="danger" variant="ghost" size="sm" onClick={() => void removeProfile()}>
+                        <Button color="secondary" variant="ghost" size="sm" onClick={() => void removeProfile()}>
                           <Trash className="size-4" /> 删除
                         </Button>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button color="secondary" variant="outline" size="sm" loading={testing} disabled={credentialState === 'missing'} onClick={() => void saveProfile(true)}>
+                      <Button color="secondary" variant="outline" size="sm" loading={testing} disabled={!draftReady} onClick={() => void saveProfile(true)}>
                         测试连接
                       </Button>
-                      <Button color="primary" size="sm" loading={saving} disabled={credentialState === 'missing'} onClick={() => void saveProfile(false)}>
+                      <Button color="primary" size="sm" loading={saving} disabled={!draftReady} onClick={() => void saveProfile(false)}>
                         保存配置
                       </Button>
                     </div>
@@ -592,7 +605,7 @@ export function OptionsApp() {
           {section === 'page' && (
             <>
               <SectionHeader title="页面翻译" description="从视口附近开始按需翻译，滚动到新内容时再继续请求，减少等待和模型用量。" />
-              <section className="rounded-2xl border border-[var(--liuyi-border)] bg-[var(--liuyi-surface)] px-6">
+              <section className="rounded-2xl border border-[var(--nira-border)] bg-[var(--nira-surface)] px-6">
                 <SettingRow title="源语言" description="通常保持自动检测；特殊内容可手动指定语言。">
                   <Select value={settings.sourceLanguage} options={SOURCE_LANGUAGES} onChange={(option) => void updateSettings({ sourceLanguage: option.value })} />
                 </SettingRow>
@@ -627,14 +640,14 @@ export function OptionsApp() {
 
           {section === 'selection' && (
             <>
-              <SectionHeader title="划词翻译" description="选中文本后显示一个小型翻译按钮；结果面板使用已确认的呼吸微光和加载动画。" />
-              <section className="rounded-2xl border border-[var(--liuyi-border)] bg-[var(--liuyi-surface)] px-6">
+              <SectionHeader title="划词翻译" description="选中文本后显示一个小型翻译按钮；结果面板使用与主界面一致的黑白样式。" />
+              <section className="rounded-2xl border border-[var(--nira-border)] bg-[var(--nira-surface)] px-6">
                 <SettingRow title="显示划词按钮" description="关闭后仍可用 Alt + Shift + T 翻译当前选区。">
                   <div className="flex justify-end"><Switch checked={settings.selectionButtonEnabled} onCheckedChange={(checked) => void updateSettings({ selectionButtonEnabled: checked })} /></div>
                 </SettingRow>
-                <SettingRow title="浮层效果" description="仅划词翻译结果使用柔和青蓝微光；页面和设置界面保持安静。">
-                  <div className="flex items-center justify-end gap-2 text-xs text-[var(--liuyi-muted)]">
-                    <span className="size-2 rounded-full bg-cyan-400 shadow-[0_0_12px_rgb(34_211_238/0.75)]" />
+                <SettingRow title="浮层样式" description="使用纯黑白面板、细边框和轻量入场动画。">
+                  <div className="flex items-center justify-end gap-2 text-xs text-[var(--nira-muted)]">
+                    <span className="size-2 rounded-full bg-[var(--nira-text)]" />
                     已启用
                   </div>
                 </SettingRow>
@@ -646,8 +659,8 @@ export function OptionsApp() {
             <>
               <SectionHeader title="Prompt 模板" description="可编辑页面与划词两套 Prompt。变量会在请求前替换，页面分段标记和安全格式约束由扩展自动追加。" />
               <div className="space-y-5">
-                <section className="rounded-2xl border border-[var(--liuyi-border)] bg-[var(--liuyi-surface)] p-6">
-                  <div className="mb-4 flex items-center gap-2"><DataControls className="size-4 text-[var(--liuyi-accent)]" /><h3 className="text-sm font-semibold">页面翻译</h3></div>
+                <section className="rounded-2xl border border-[var(--nira-border)] bg-[var(--nira-surface)] p-6">
+                  <div className="mb-4 flex items-center gap-2"><DataControls className="size-4" /><h3 className="text-sm font-semibold">页面翻译</h3></div>
                   <label className="block">
                     <span className="mb-1.5 block text-xs font-medium">System Prompt</span>
                     <Textarea rows={7} autoResize maxRows={14} value={prompts.pageSystem} onChange={(event) => setPrompts({ ...prompts, pageSystem: event.target.value })} />
@@ -657,8 +670,8 @@ export function OptionsApp() {
                     <Textarea rows={4} autoResize maxRows={10} value={prompts.pageUser} onChange={(event) => setPrompts({ ...prompts, pageUser: event.target.value })} />
                   </label>
                 </section>
-                <section className="rounded-2xl border border-[var(--liuyi-border)] bg-[var(--liuyi-surface)] p-6">
-                  <div className="mb-4 flex items-center gap-2"><SelectText className="size-4 text-[var(--liuyi-accent)]" /><h3 className="text-sm font-semibold">划词翻译</h3></div>
+                <section className="rounded-2xl border border-[var(--nira-border)] bg-[var(--nira-surface)] p-6">
+                  <div className="mb-4 flex items-center gap-2"><SelectText className="size-4" /><h3 className="text-sm font-semibold">划词翻译</h3></div>
                   <label className="block">
                     <span className="mb-1.5 block text-xs font-medium">System Prompt</span>
                     <Textarea rows={5} autoResize maxRows={12} value={prompts.selectionSystem} onChange={(event) => setPrompts({ ...prompts, selectionSystem: event.target.value })} />
@@ -668,7 +681,7 @@ export function OptionsApp() {
                     <Textarea rows={4} autoResize maxRows={10} value={prompts.selectionUser} onChange={(event) => setPrompts({ ...prompts, selectionUser: event.target.value })} />
                   </label>
                 </section>
-                <div className="rounded-xl bg-[var(--liuyi-sidebar)] px-4 py-3 text-[11px] leading-5 text-[var(--liuyi-muted)]">
+                <div className="rounded-xl bg-[var(--nira-sidebar)] px-4 py-3 text-[11px] leading-5 text-[var(--nira-muted)]">
                   可用变量：<code>{'{{sourceLanguage}}'}</code>、<code>{'{{targetLanguage}}'}</code>、<code>{'{{text}}'}</code>。模型输出始终按不可信文本处理，不会作为 HTML 注入网页。
                 </div>
                 <div className="flex justify-end gap-2">
@@ -682,7 +695,7 @@ export function OptionsApp() {
           {section === 'appearance' && (
             <>
               <SectionHeader title="外观" description="popup、设置页和网页内浮层共享主题设置；跟随系统时会自动响应系统变化。" />
-              <section className="rounded-2xl border border-[var(--liuyi-border)] bg-[var(--liuyi-surface)] px-6">
+              <section className="rounded-2xl border border-[var(--nira-border)] bg-[var(--nira-surface)] px-6">
                 <SettingRow title="界面主题" description="选择浅色、深色，或跟随当前操作系统。">
                   <SegmentedControl
                     value={settings.theme}
@@ -702,12 +715,12 @@ export function OptionsApp() {
           {section === 'shortcuts' && (
             <>
               <SectionHeader title="快捷键" description="Chrome 和 Edge 会在扩展快捷键页面中管理按键冲突与自定义组合。" />
-              <section className="rounded-2xl border border-[var(--liuyi-border)] bg-[var(--liuyi-surface)] px-6">
+              <section className="rounded-2xl border border-[var(--nira-border)] bg-[var(--nira-surface)] px-6">
                 <SettingRow title="切换当前页面翻译" description="无须打开 popup 即可启用或还原当前页面。">
-                  <kbd className="block rounded-lg border border-[var(--liuyi-border)] bg-[var(--liuyi-sidebar)] px-3 py-2 text-center text-xs">Alt + Shift + P</kbd>
+                  <kbd className="block rounded-lg border border-[var(--nira-border)] bg-[var(--nira-sidebar)] px-3 py-2 text-center text-xs">Alt + Shift + P</kbd>
                 </SettingRow>
                 <SettingRow title="翻译当前选区" description="选择网页文本后直接打开翻译结果浮层。">
-                  <kbd className="block rounded-lg border border-[var(--liuyi-border)] bg-[var(--liuyi-sidebar)] px-3 py-2 text-center text-xs">Alt + Shift + T</kbd>
+                  <kbd className="block rounded-lg border border-[var(--nira-border)] bg-[var(--nira-sidebar)] px-3 py-2 text-center text-xs">Alt + Shift + T</kbd>
                 </SettingRow>
               </section>
               <div className="mt-5 flex justify-end">
@@ -719,14 +732,14 @@ export function OptionsApp() {
           )}
 
           {status && (
-            <div className="mt-5 flex items-center gap-2 rounded-xl border border-[var(--liuyi-border)] bg-[var(--liuyi-surface)] px-4 py-3 text-xs shadow-[0_8px_30px_rgb(0_0_0/0.05)]">
+            <div className="mt-5 flex items-center gap-2 rounded-xl border border-[var(--nira-border)] bg-[var(--nira-surface)] px-4 py-3 text-xs shadow-[0_8px_30px_rgb(0_0_0/0.05)]">
               {status.includes('成功') || status.includes('已保存') || status.includes('已恢复') || status.includes('已清空')
-                ? <CheckCircleFilled className="size-4 shrink-0 text-emerald-500" />
-                : <SettingsSlider className="size-4 shrink-0 text-amber-500" />}
+                ? <CheckCircleFilled className="size-4 shrink-0" />
+                : <SettingsSlider className="size-4 shrink-0" />}
               {status}
             </div>
           )}
-          {loading && <p className="text-sm text-[var(--liuyi-muted)]">正在加载设置…</p>}
+          {loading && <p className="text-sm text-[var(--nira-muted)]">正在加载设置…</p>}
         </div>
       </main>
     </div>

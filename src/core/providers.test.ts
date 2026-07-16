@@ -3,6 +3,7 @@ import type { ModelProfile } from '../types/domain';
 import {
   PROVIDER_HARD_TIMEOUT_MS,
   requestAnthropicMessages,
+  requestGeminiGenerateContent,
   requestOpenAIChatCompletion,
 } from './providers';
 
@@ -29,6 +30,29 @@ afterEach(() => {
 });
 
 describe('OpenAI Chat Completions adapter', () => {
+  it('invokes fetch without binding the request context as its receiver', async () => {
+    let receiver: unknown = 'not-called';
+    const fetchMock = vi.fn(function fetchWithReceiver(
+      this: unknown,
+      _url: RequestInfo | URL,
+      _init?: RequestInit,
+    ): Promise<Response> {
+      receiver = this;
+      return Promise.resolve(new Response(JSON.stringify({
+        choices: [{ message: { content: '你好' } }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    });
+
+    await requestOpenAIChatCompletion({
+      profile: profile(),
+      systemPrompt: 'system',
+      userPrompt: 'user',
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+
+    expect(receiver).toBeUndefined();
+  });
+
   it('uses native extension fetch semantics and max_completion_tokens', async () => {
     const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({
       choices: [{ message: { content: '你好' } }],
@@ -75,7 +99,7 @@ describe('OpenAI Chat Completions adapter', () => {
     });
   });
 
-  it('explains client-side Chrome blocking when fetch has no HTTP response', async () => {
+  it('explains network checks without claiming every fetch failure is client blocking', async () => {
     const fetchMock = vi.fn(async () => {
       throw new TypeError('Failed to fetch');
     });
@@ -93,7 +117,7 @@ describe('OpenAI Chat Completions adapter', () => {
       payload: {
         code: 'NETWORK_ERROR',
         retryable: true,
-        message: expect.stringContaining('ERR_BLOCKED_BY_CLIENT'),
+        message: expect.stringContaining('Chrome 未收到 HTTP 响应'),
       },
     });
   });
@@ -167,5 +191,27 @@ describe('Anthropic Messages adapter', () => {
       userPrompt: 'user',
       fetchImpl: fetchMock as unknown as typeof fetch,
     })).rejects.toMatchObject({ payload: { code: 'INVALID_RESPONSE' } });
+  });
+});
+
+describe('Gemini generateContent adapter', () => {
+  it('uses the native Gemini endpoint, API key header and response parts', async () => {
+    const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: '你' }, { text: '好' }] } }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    await expect(requestGeminiGenerateContent({
+      profile: profile({
+        preset: 'gemini',
+        protocol: 'gemini-generate',
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+        model: 'gemini-2.5-flash',
+      }),
+      systemPrompt: 'system',
+      userPrompt: 'user',
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    })).resolves.toBe('你好');
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent');
+    expect((init as RequestInit).headers).toMatchObject({ 'x-goog-api-key': 'test-key' });
   });
 });

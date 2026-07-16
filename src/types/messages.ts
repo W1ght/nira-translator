@@ -19,7 +19,6 @@ export type RuntimeRequest =
   | { type: 'profiles:save'; profile: ModelProfileInput }
   | { type: 'profiles:delete'; profileId: string }
   | { type: 'profiles:test'; profileId: string }
-  | { type: 'permissions:request-api'; baseUrl: string }
   | { type: 'translate'; request: TranslationRequest }
   | { type: 'translate:cancel'; jobId: string }
   | { type: 'page:get-state' }
@@ -38,12 +37,10 @@ export type RuntimeResponse<T extends RuntimeRequest = RuntimeRequest> =
           ? { ok: true; profiles: PublicModelProfile[]; settings: ExtensionSettings }
           : T['type'] extends 'profiles:test'
             ? { ok: true; durationMs: number; output: string; actualModel: string; warning?: string }
-            : T['type'] extends 'permissions:request-api'
-              ? { ok: true; granted: boolean }
-              : T['type'] extends 'translate'
-                ? { ok: true; result: TranslationResult }
-                : T['type'] extends 'page:get-state' | 'page:set-enabled' | 'page:set-mode'
-                  ? { ok: true; state: PageTranslationState }
-                  : { ok: true };
+            : T['type'] extends 'translate'
+              ? { ok: true; result: TranslationResult }
+              : T['type'] extends 'page:get-state' | 'page:set-enabled' | 'page:set-mode'
+                ? { ok: true; state: PageTranslationState }
+                : { ok: true };
 
 export type RuntimeFailure = { ok: false; error: TranslationErrorPayload };

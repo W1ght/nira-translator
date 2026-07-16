@@ -1,5 +1,47 @@
-export type ProviderProtocol = 'openai-chat' | 'anthropic-messages';
-export type ProviderPreset = 'openai' | 'deepseek' | 'custom';
+export type ProviderProtocol =
+  | 'openai-chat'
+  | 'anthropic-messages'
+  | 'gemini-generate'
+  | 'builtin-translator'
+  | 'google-translate'
+  | 'google-html'
+  | 'microsoft-translator'
+  | 'azure-translator'
+  | 'deepl'
+  | 'deepl-free'
+  | 'deeplx'
+  | 'tencent-translator'
+  | 'volcengine-translator'
+  | 'cloudflare-ai'
+  | 'custom-json';
+
+export type ProviderPreset =
+  | 'builtin-ai'
+  | 'google'
+  | 'google-html'
+  | 'microsoft'
+  | 'azure'
+  | 'deepseek'
+  | 'opencode-go'
+  | 'siliconflow'
+  | 'xiaomi-mimo'
+  | 'aliyun-bailian'
+  | 'cerebras'
+  | 'zai'
+  | 'tencent'
+  | 'volcengine'
+  | 'deepl'
+  | 'deepl-free'
+  | 'deeplx'
+  | 'ephone-ai'
+  | 'openai'
+  | 'gemini'
+  | 'gemini-openai'
+  | 'claude'
+  | 'cloudflare-ai'
+  | 'ollama'
+  | 'openrouter'
+  | 'custom';
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type PageDisplayMode = 'dual' | 'translation';
 export type TranslationKind = 'page' | 'selection' | 'connection-test';
@@ -12,6 +54,7 @@ export interface ModelProfile {
   baseUrl: string;
   apiKey: string;
   model: string;
+  region?: string;
   temperature: number | null;
   maxOutputTokens: number;
   timeoutMs: number;

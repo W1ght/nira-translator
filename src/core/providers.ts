@@ -1,4 +1,5 @@
 import type { ModelProfile, TranslationErrorPayload } from '../types/domain';
+import { getProviderDefinition } from '../constants/providers';
 import {
   createTranslationError,
   isAbortError,
@@ -43,10 +44,11 @@ function getNestedString(
 }
 
 function validateProfile(profile: ModelProfile): void {
-  if (!profile.apiKey.trim()) {
+  const definition = getProviderDefinition(profile.preset);
+  if (definition.requiresApiKey && !profile.apiKey.trim()) {
     throw createTranslationError('INVALID_PROFILE', '请先填写 API Key', false);
   }
-  if (!profile.model.trim()) {
+  if (definition.requiresModel && !profile.model.trim()) {
     throw createTranslationError('INVALID_PROFILE', '请先填写模型名称', false);
   }
   if (!Number.isInteger(profile.maxOutputTokens) || profile.maxOutputTokens <= 0) {
@@ -136,7 +138,11 @@ async function fetchWithDeadline(
     // request; adding redirect/cache/referrer restrictions here can turn a
     // provider or proxy response into an opaque TypeError before any HTTP
     // status is observable.
-    return await context.fetchImpl(context.endpoint, {
+    // Invoke the function without `context` as its receiver. Chromium's native
+    // WorkerGlobalScope.fetch rejects an object receiver with
+    // `TypeError: Illegal invocation`, even though ordinary test doubles do not.
+    const fetchImpl = context.fetchImpl;
+    return await fetchImpl(context.endpoint, {
       ...init,
       signal: controller.signal,
     });
@@ -153,7 +159,7 @@ async function fetchWithDeadline(
     const hostname = new URL(context.endpoint).hostname;
     throw createTranslationError(
       'NETWORK_ERROR',
-      `无法连接 ${hostname}。Chrome 可能已在客户端屏蔽该域名（ERR_BLOCKED_BY_CLIENT）；请在广告过滤、隐私、安全或代理扩展中允许 ${hostname}，重新加载网页后再试`,
+      `无法连接 ${hostname}：Chrome 未收到 HTTP 响应。当前扩展已获该域名访问权限，请检查网络或系统代理；如果控制台显示 ERR_BLOCKED_BY_CLIENT，请在广告过滤、隐私、安全或代理扩展中允许 ${hostname}`,
       true,
     );
   } finally {
@@ -203,6 +209,8 @@ export async function requestOpenAIChatCompletion(
   } else if (request.profile.preset === 'deepseek') {
     body.max_tokens = request.profile.maxOutputTokens;
     body.thinking = { type: 'disabled' };
+  } else if (request.profile.preset !== 'custom') {
+    body.max_tokens = request.profile.maxOutputTokens;
   }
   if (request.profile.temperature !== null) {
     body.temperature = request.profile.temperature;
@@ -211,7 +219,7 @@ export async function requestOpenAIChatCompletion(
   const response = await fetchWithDeadline(context, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${request.profile.apiKey.trim()}`,
+      ...(request.profile.apiKey.trim() ? { Authorization: `Bearer ${request.profile.apiKey.trim()}` } : {}),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -228,7 +236,7 @@ export async function requestOpenAIChatCompletion(
     throw createTranslationError('INVALID_RESPONSE', 'OpenAI 响应不是有效的 JSON', true);
   }
 
-  const providerName = request.profile.preset === 'deepseek' ? 'DeepSeek' : 'OpenAI';
+  const providerName = getProviderDefinition(request.profile.preset).name;
   const choices = isRecord(json) ? json.choices : undefined;
   const firstChoice = Array.isArray(choices) ? choices[0] : undefined;
   const finishReason = getNestedString(firstChoice, ['finish_reason']);
@@ -305,12 +313,61 @@ export async function requestAnthropicMessages(
   return text;
 }
 
+export async function requestGeminiGenerateContent(
+  request: ProviderTextRequest,
+): Promise<string> {
+  validateProfile(request.profile);
+  const base = buildProviderEndpoint(request.profile.baseUrl, request.profile.protocol);
+  const url = new URL(base);
+  url.pathname = `${url.pathname.replace(/\/+$/, '')}/models/${encodeURIComponent(request.profile.model.trim())}:generateContent`;
+  const context: RequestContext = {
+    profile: request.profile,
+    endpoint: url.toString(),
+    fetchImpl: request.fetchImpl ?? fetch,
+    ...(request.signal ? { signal: request.signal } : {}),
+  };
+  const body: Record<string, unknown> = {
+    systemInstruction: { parts: [{ text: request.systemPrompt }] },
+    contents: [{ role: 'user', parts: [{ text: request.userPrompt }] }],
+    generationConfig: {
+      maxOutputTokens: request.profile.maxOutputTokens,
+      ...(request.profile.temperature !== null ? { temperature: request.profile.temperature } : {}),
+    },
+  };
+  const response = await fetchWithDeadline(context, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': request.profile.apiKey.trim(),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw errorForStatus(response.status, await readProviderError(response));
+  let json: unknown;
+  try {
+    json = await response.json();
+  } catch {
+    throw createTranslationError('INVALID_RESPONSE', 'Gemini 响应不是有效的 JSON', true);
+  }
+  const candidates = isRecord(json) ? json.candidates : undefined;
+  const first = Array.isArray(candidates) ? candidates[0] : undefined;
+  const parts = isRecord(first) && isRecord(first.content) ? first.content.parts : undefined;
+  const text = Array.isArray(parts)
+    ? parts.map((part) => getNestedString(part, ['text'])).filter(Boolean).join('')
+    : '';
+  if (!text.trim()) throw createTranslationError('INVALID_RESPONSE', 'Gemini 响应缺少翻译文本', true);
+  return text;
+}
+
 export async function requestProviderText(request: ProviderTextRequest): Promise<string> {
   if (request.profile.protocol === 'openai-chat') {
     return requestOpenAIChatCompletion(request);
   }
   if (request.profile.protocol === 'anthropic-messages') {
     return requestAnthropicMessages(request);
+  }
+  if (request.profile.protocol === 'gemini-generate') {
+    return requestGeminiGenerateContent(request);
   }
   throw createTranslationError('INVALID_PROFILE', '不支持的模型协议', false);
 }

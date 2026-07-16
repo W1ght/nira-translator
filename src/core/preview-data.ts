@@ -1,4 +1,5 @@
-import { DEFAULT_PROMPTS, DEFAULT_SETTINGS } from '../constants/defaults';
+import { DEFAULT_PROFILES, DEFAULT_PROMPTS, DEFAULT_SETTINGS } from '../constants/defaults';
+import { getProviderDefinition } from '../constants/providers';
 import type {
   ExtensionSettings,
   PageTranslationState,
@@ -13,36 +14,13 @@ export const PREVIEW_SETTINGS: ExtensionSettings = {
   activeProfileId: 'deepseek-default',
 };
 
-export const PREVIEW_PROFILES: PublicModelProfile[] = [
-  {
-    id: 'openai-default',
-    name: 'OpenAI',
-    preset: 'openai',
-    protocol: 'openai-chat',
-    baseUrl: 'https://api.openai.com/v1',
-    model: 'gpt-5-mini',
-    temperature: null,
-    maxOutputTokens: 4096,
-    timeoutMs: 27_000,
-    createdAt: now,
-    updatedAt: now,
-    hasApiKey: true,
-  },
-  {
-    id: 'deepseek-default',
-    name: 'DeepSeek',
-    preset: 'deepseek',
-    protocol: 'openai-chat',
-    baseUrl: 'https://api.deepseek.com',
-    model: 'deepseek-v4-flash',
-    temperature: null,
-    maxOutputTokens: 4096,
-    timeoutMs: 27_000,
-    createdAt: now,
-    updatedAt: now,
-    hasApiKey: true,
-  },
-];
+export const PREVIEW_PROFILES: PublicModelProfile[] = DEFAULT_PROFILES.map((profile) => ({
+  ...profile,
+  model: profile.model || (getProviderDefinition(profile.preset).requiresModel ? '选择模型' : ''),
+  createdAt: now,
+  updatedAt: now,
+  hasApiKey: profile.preset === 'openai' || profile.preset === 'deepseek',
+}));
 
 export const PREVIEW_PROMPTS: PromptTemplate = { ...DEFAULT_PROMPTS };
 
@@ -60,4 +38,3 @@ export function isBrowserPreview(): boolean {
   return location.protocol.startsWith('http')
     && new URLSearchParams(location.search).has('preview');
 }
-

@@ -23,8 +23,8 @@ const BLOCK_SELECTOR = [
 ].join(',');
 
 const EXCLUDED_SELECTOR = [
-  '[data-liuyi-root]',
-  '[data-liuyi-translation]',
+  '[data-nira-root]',
+  '[data-nira-translation]',
   '[translate="no"]',
   '[hidden]',
   '[inert]',
@@ -210,7 +210,7 @@ export class PageTranslator {
 
     for (const record of this.records.values()) {
       record.translationElement?.remove();
-      record.element.removeAttribute('data-liuyi-source-hidden');
+      record.element.removeAttribute('data-nira-source-hidden');
     }
     this.records.clear();
     this.lastError = null;
@@ -356,7 +356,7 @@ export class PageTranslator {
   private renderLoading(record: BlockRecord): void {
     if (!record.element.isConnected || record.translationElement) return;
     const translationElement = createTranslationElement(record.element);
-    translationElement.dataset.liuyiState = 'loading';
+    translationElement.dataset.niraState = 'loading';
     translationElement.textContent = '正在翻译';
     record.element.insertAdjacentElement('afterend', translationElement);
     record.translationElement = translationElement;
@@ -368,7 +368,7 @@ export class PageTranslator {
     const text = record.translations.join('\n');
     const translationElement = record.translationElement ?? createTranslationElement(record.element);
     if (!translationElement.isConnected) record.element.insertAdjacentElement('afterend', translationElement);
-    translationElement.dataset.liuyiState = 'done';
+    translationElement.dataset.niraState = 'done';
     translationElement.lang = this.settings.targetLanguage;
     translationElement.textContent = text;
     record.translationElement = translationElement;
@@ -380,24 +380,24 @@ export class PageTranslator {
   private applyDisplayMode(record: BlockRecord): void {
     if (!record.translationElement) return;
     if (this.settings.pageDisplayMode === 'translation' && record.status === 'translated') {
-      record.element.setAttribute('data-liuyi-source-hidden', '');
+      record.element.setAttribute('data-nira-source-hidden', '');
     } else {
-      record.element.removeAttribute('data-liuyi-source-hidden');
+      record.element.removeAttribute('data-nira-source-hidden');
     }
   }
 
   private handleMutations(mutations: MutationRecord[]): void {
     const roots = new Set<ParentNode>();
     for (const mutation of mutations) {
-      if (mutation.target instanceof Element && mutation.target.closest('[data-liuyi-root]')) continue;
+      if (mutation.target instanceof Element && mutation.target.closest('[data-nira-root]')) continue;
       if (mutation.type === 'characterData') {
         const parent = mutation.target.parentElement?.closest<HTMLElement>(BLOCK_SELECTOR);
-        if (parent && !parent.closest('[data-liuyi-root]')) this.refreshRecord(parent);
+        if (parent && !parent.closest('[data-nira-root]')) this.refreshRecord(parent);
         continue;
       }
 
       for (const node of mutation.addedNodes) {
-        if (node instanceof HTMLElement && !node.closest('[data-liuyi-root]')) roots.add(node);
+        if (node instanceof HTMLElement && !node.closest('[data-nira-root]')) roots.add(node);
       }
     }
 
@@ -413,7 +413,7 @@ export class PageTranslator {
 
     this.intersectionObserver?.unobserve(element);
     record.translationElement?.remove();
-    element.removeAttribute('data-liuyi-source-hidden');
+    element.removeAttribute('data-nira-source-hidden');
     this.records.delete(element);
     this.scan(element);
   }
@@ -473,7 +473,7 @@ function viewportDistance(rect: DOMRectReadOnly): number {
 
 function createTranslationElement(source: HTMLElement): HTMLElement {
   const element = document.createElement(source.tagName === 'LI' ? 'li' : 'div');
-  element.setAttribute('data-liuyi-translation', '');
+  element.setAttribute('data-nira-translation', '');
   const sourceStyle = window.getComputedStyle(source);
   for (const property of [
     'font-family',

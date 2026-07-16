@@ -81,7 +81,7 @@ export default defineContentScript({
 
 function installPageStyle(): HTMLStyleElement {
   const style = document.createElement('style');
-  style.dataset.liuyiRoot = 'page-style';
+  style.dataset.niraRoot = 'page-style';
   style.textContent = pageCss;
   document.documentElement.append(style);
   return style;

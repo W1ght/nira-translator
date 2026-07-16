@@ -85,7 +85,7 @@ fn build_client(request: &DiagnosticRequest) -> Result<Client, String> {
     let mut builder = Client::builder()
         .connect_timeout(Duration::from_secs(12))
         .timeout(Duration::from_secs(30))
-        .user_agent("Liuyi-DeepSeek-Diagnostic/0.1.5");
+        .user_agent("Nira-Translator-DeepSeek-Diagnostic/0.2.0");
 
     match request.proxy_mode.as_str() {
         "direct" => builder = builder.no_proxy(),
@@ -243,7 +243,7 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![run_diagnostic])
         .run(tauri::generate_context!())
-        .expect("error while running Liuyi DeepSeek Diagnostic");
+        .expect("error while running Nira translator DeepSeek Diagnostic");
 }
 
 #[cfg(test)]

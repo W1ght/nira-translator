@@ -1,4 +1,4 @@
-# 流译 DeepSeek 诊断器
+# Nira translator DeepSeek 诊断器
 
 独立的 Tauri 2 Windows 客户端。网络请求由 Rust `reqwest` 发出，不经过 Chrome 扩展或 WebView `fetch`。
 

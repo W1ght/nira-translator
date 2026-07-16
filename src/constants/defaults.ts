@@ -1,4 +1,5 @@
 import type { ExtensionSettings, ModelProfile, PromptTemplate } from '../types/domain';
+import { PROVIDER_CATALOG } from './providers';
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
   theme: 'system',
@@ -27,33 +28,18 @@ Return only the translation. Preserve proper nouns, code, numbers, and formattin
 
 const now = Date.now();
 
-export const DEFAULT_PROFILES: ModelProfile[] = [
-  {
-    id: 'openai-default',
-    name: 'OpenAI',
-    preset: 'openai',
-    protocol: 'openai-chat',
-    baseUrl: 'https://api.openai.com/v1',
-    apiKey: '',
-    model: '',
-    temperature: null,
-    maxOutputTokens: 4096,
-    timeoutMs: 27_000,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: 'deepseek-default',
-    name: 'DeepSeek',
-    preset: 'deepseek',
-    protocol: 'openai-chat',
-    baseUrl: 'https://api.deepseek.com',
-    apiKey: '',
-    model: 'deepseek-v4-flash',
-    temperature: null,
-    maxOutputTokens: 4096,
-    timeoutMs: 27_000,
-    createdAt: now,
-    updatedAt: now,
-  },
-];
+export const DEFAULT_PROFILES: ModelProfile[] = PROVIDER_CATALOG.map((provider) => ({
+  id: `${provider.preset}-default`,
+  name: provider.name,
+  preset: provider.preset,
+  protocol: provider.protocol,
+  baseUrl: provider.baseUrl,
+  apiKey: '',
+  model: provider.model,
+  region: '',
+  temperature: null,
+  maxOutputTokens: 4096,
+  timeoutMs: 27_000,
+  createdAt: now,
+  updatedAt: now,
+}));

@@ -13,12 +13,14 @@ import {
   migrateDeepSeekProfiles,
 } from './profile-migrations';
 
+const PROVIDER_CATALOG_MIGRATION_VERSION = 3;
+
 const STORAGE_KEYS = {
-  settings: 'liuyi:settings:v1',
-  prompts: 'liuyi:prompts:v1',
-  profiles: 'liuyi:profiles:v1',
-  credentials: 'liuyi:credentials:v1',
-  schemaVersion: 'liuyi:schema-version',
+  settings: 'nira:settings:v1',
+  prompts: 'nira:prompts:v1',
+  profiles: 'nira:profiles:v1',
+  credentials: 'nira:credentials:v1',
+  schemaVersion: 'nira:schema-version',
 } as const;
 
 type StoredModelProfile = Omit<ModelProfile, 'apiKey'>;
@@ -63,12 +65,19 @@ export async function initializeStorage(): Promise<void> {
   if (!existing[STORAGE_KEYS.prompts]) seed[STORAGE_KEYS.prompts] = DEFAULT_PROMPTS;
   if (!storedProfiles) {
     seed[STORAGE_KEYS.profiles] = DEFAULT_PROFILES.map(withoutCredential);
-  } else if (schemaVersion < DEEPSEEK_OPENAI_MIGRATION_VERSION) {
-    seed[STORAGE_KEYS.profiles] = migrateDeepSeekProfiles(storedProfiles);
+  } else if (schemaVersion < PROVIDER_CATALOG_MIGRATION_VERSION) {
+    const migrated = schemaVersion < DEEPSEEK_OPENAI_MIGRATION_VERSION
+      ? migrateDeepSeekProfiles(storedProfiles)
+      : storedProfiles;
+    const ids = new Set(migrated.map((profile) => profile.id));
+    seed[STORAGE_KEYS.profiles] = [
+      ...migrated.map((profile) => ({ ...profile, region: profile.region ?? '' })),
+      ...DEFAULT_PROFILES.filter((profile) => !ids.has(profile.id)).map(withoutCredential),
+    ];
   }
   if (!existing[STORAGE_KEYS.credentials]) seed[STORAGE_KEYS.credentials] = {};
-  if (schemaVersion < DEEPSEEK_OPENAI_MIGRATION_VERSION) {
-    seed[STORAGE_KEYS.schemaVersion] = DEEPSEEK_OPENAI_MIGRATION_VERSION;
+  if (schemaVersion < PROVIDER_CATALOG_MIGRATION_VERSION) {
+    seed[STORAGE_KEYS.schemaVersion] = PROVIDER_CATALOG_MIGRATION_VERSION;
   }
 
   if (Object.keys(seed).length) await browser.storage.local.set(seed);
@@ -111,10 +120,11 @@ export async function resetPrompts(): Promise<PromptTemplate> {
 }
 
 async function getStoredProfiles(): Promise<StoredModelProfile[]> {
-  return readLocal<StoredModelProfile[]>(
+  const profiles = await readLocal<StoredModelProfile[]>(
     STORAGE_KEYS.profiles,
     DEFAULT_PROFILES.map(withoutCredential),
   );
+  return profiles.map((profile) => ({ ...profile, region: profile.region ?? '' }));
 }
 
 async function getCredentials(): Promise<CredentialStore> {
@@ -158,6 +168,7 @@ export async function saveProfile(input: ModelProfileInput): Promise<PublicModel
     protocol: input.protocol,
     baseUrl: input.baseUrl.trim(),
     model: input.model.trim(),
+    region: input.region?.trim() ?? '',
     temperature: input.temperature,
     maxOutputTokens: input.maxOutputTokens,
     timeoutMs: input.timeoutMs,
@@ -209,4 +220,3 @@ export async function deleteProfile(profileId: string): Promise<PublicModelProfi
 }
 
 export { STORAGE_KEYS };
-

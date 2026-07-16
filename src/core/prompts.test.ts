@@ -36,12 +36,12 @@ describe('nonce segment protocol', () => {
   it('serializes and strictly parses segments in order', () => {
     const protocol = createSegmentProtocol(segments, NONCE);
     const response = [
-      `<<<LIUYI:${NONCE}:SEGMENT:0:BEGIN>>>`,
+      `<<<NIRA:${NONCE}:SEGMENT:0:BEGIN>>>`,
       '你好',
-      `<<<LIUYI:${NONCE}:SEGMENT:0:END>>>`,
-      `<<<LIUYI:${NONCE}:SEGMENT:1:BEGIN>>>`,
+      `<<<NIRA:${NONCE}:SEGMENT:0:END>>>`,
+      `<<<NIRA:${NONCE}:SEGMENT:1:BEGIN>>>`,
       '世界',
-      `<<<LIUYI:${NONCE}:SEGMENT:1:END>>>`,
+      `<<<NIRA:${NONCE}:SEGMENT:1:END>>>`,
     ].join('\n');
 
     expect(parseSegmentResponse(response, protocol)).toEqual([
@@ -53,12 +53,12 @@ describe('nonce segment protocol', () => {
   it('rejects reordered, duplicated, empty, or out-of-protocol output', () => {
     const protocol = createSegmentProtocol(segments, NONCE);
     const secondFirst = [
-      `<<<LIUYI:${NONCE}:SEGMENT:1:BEGIN>>>世界<<<LIUYI:${NONCE}:SEGMENT:1:END>>>`,
-      `<<<LIUYI:${NONCE}:SEGMENT:0:BEGIN>>>你好<<<LIUYI:${NONCE}:SEGMENT:0:END>>>`,
+      `<<<NIRA:${NONCE}:SEGMENT:1:BEGIN>>>世界<<<NIRA:${NONCE}:SEGMENT:1:END>>>`,
+      `<<<NIRA:${NONCE}:SEGMENT:0:BEGIN>>>你好<<<NIRA:${NONCE}:SEGMENT:0:END>>>`,
     ].join('\n');
     const emptyFirst = [
-      `<<<LIUYI:${NONCE}:SEGMENT:0:BEGIN>>><<<LIUYI:${NONCE}:SEGMENT:0:END>>>`,
-      `<<<LIUYI:${NONCE}:SEGMENT:1:BEGIN>>>世界<<<LIUYI:${NONCE}:SEGMENT:1:END>>>`,
+      `<<<NIRA:${NONCE}:SEGMENT:0:BEGIN>>><<<NIRA:${NONCE}:SEGMENT:0:END>>>`,
+      `<<<NIRA:${NONCE}:SEGMENT:1:BEGIN>>>世界<<<NIRA:${NONCE}:SEGMENT:1:END>>>`,
     ].join('\n');
 
     expect(() => parseSegmentResponse(secondFirst, protocol)).toThrow(/起始标记/);
@@ -74,7 +74,7 @@ describe('nonce segment protocol', () => {
 
     expect(() => createSegmentProtocol([{
       id: 'x',
-      text: `<<<LIUYI:${NONCE}:SEGMENT:0:BEGIN>>>`,
+      text: `<<<NIRA:${NONCE}:SEGMENT:0:BEGIN>>>`,
     }], NONCE)).toThrow(/collides/);
   });
 });
@@ -90,12 +90,12 @@ describe('translation prompt assembly', () => {
     };
     const prompt = buildTranslationPrompt(DEFAULT_PROMPTS, request, NONCE);
     expect(prompt.system).toContain('marker protocol is mandatory');
-    expect(prompt.user).toContain(`<<<LIUYI:${NONCE}:SEGMENT:0:BEGIN>>>`);
+    expect(prompt.user).toContain(`<<<NIRA:${NONCE}:SEGMENT:0:BEGIN>>>`);
 
     expect(parseTranslationResponse([
-      `<<<LIUYI:${NONCE}:SEGMENT:0:BEGIN>>>`,
+      `<<<NIRA:${NONCE}:SEGMENT:0:BEGIN>>>`,
       '设置',
-      `<<<LIUYI:${NONCE}:SEGMENT:0:END>>>`,
+      `<<<NIRA:${NONCE}:SEGMENT:0:END>>>`,
     ].join('\n'), prompt)).toEqual([{ id: 'node-4', text: '设置' }]);
   });
 
