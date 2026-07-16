@@ -75,6 +75,29 @@ describe('OpenAI Chat Completions adapter', () => {
     });
   });
 
+  it('explains client-side Chrome blocking when fetch has no HTTP response', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+
+    await expect(requestOpenAIChatCompletion({
+      profile: profile({
+        preset: 'deepseek',
+        baseUrl: 'https://api.deepseek.com',
+        model: 'deepseek-v4-flash',
+      }),
+      systemPrompt: 'system',
+      userPrompt: 'user',
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    })).rejects.toMatchObject({
+      payload: {
+        code: 'NETWORK_ERROR',
+        retryable: true,
+        message: expect.stringContaining('ERR_BLOCKED_BY_CLIENT'),
+      },
+    });
+  });
+
   it('aborts at the 27 second hard deadline', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => new Promise<Response>(

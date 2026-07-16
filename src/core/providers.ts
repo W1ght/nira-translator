@@ -153,7 +153,7 @@ async function fetchWithDeadline(
     const hostname = new URL(context.endpoint).hostname;
     throw createTranslationError(
       'NETWORK_ERROR',
-      `无法连接 ${hostname}：请求未获得 HTTP 响应。请检查网络、代理或扩展权限，并确认已重新加载扩展`,
+      `无法连接 ${hostname}。Chrome 可能已在客户端屏蔽该域名（ERR_BLOCKED_BY_CLIENT）；请在广告过滤、隐私、安全或代理扩展中允许 ${hostname}，重新加载网页后再试`,
       true,
     );
   } finally {

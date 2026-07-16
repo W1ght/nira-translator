@@ -104,6 +104,10 @@ src/
 - 页面译文当前以安全纯文本呈现；原网页链接和强调格式保留在原文中，不会从模型输出重建任意 HTML。
 - 浏览器内置页、扩展商店等受保护页面无法注入 content script。
 
+## DeepSeek 连接排查
+
+如果扩展提示 `ERR_BLOCKED_BY_CLIENT`，说明请求尚未到达 DeepSeek，Chrome 已在客户端拦截 `api.deepseek.com`。请直接在 Chrome 打开 `https://api.deepseek.com/models`：正常连通时会收到 DeepSeek 的 JSON 鉴权错误；如果浏览器显示“已被屏蔽”，请在广告过滤、隐私、安全、代理或其他翻译扩展中将 `api.deepseek.com` 加入白名单，然后重新加载网页。
+
 ## GitHub 自动构建与更新
 
 - 每次推送和 Pull Request 都会运行类型检查、单元测试及 Chrome/Edge 构建。
