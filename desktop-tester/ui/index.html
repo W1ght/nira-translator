@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>流译 DeepSeek 诊断器</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div class="logo">译</div>
+        <div>
+          <p class="eyebrow">LIUYI NETWORK LAB</p>
+          <h1>DeepSeek 连接诊断</h1>
+          <p>由 Rust 直接发起请求，不经过 Chrome 扩展网络层。</p>
+        </div>
+        <span class="runtime">Tauri · Rust</span>
+      </header>
+
+      <section class="grid">
+        <form id="diagnostic-form" class="panel form-panel">
+          <div class="section-title">
+            <span>连接配置</span>
+            <span class="safe">Key 不落盘</span>
+          </div>
+
+          <label>
+            <span>API 地址</span>
+            <input id="base-url" value="https://api.deepseek.com" spellcheck="false" />
+          </label>
+
+          <label>
+            <span>模型名称</span>
+            <input id="model" value="deepseek-v4-flash" spellcheck="false" />
+          </label>
+
+          <label>
+            <span>API Key（仅真实翻译需要）</span>
+            <input id="api-key" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+          </label>
+
+          <label>
+            <span>代理模式</span>
+            <select id="proxy-mode">
+              <option value="system">系统代理（推荐先测）</option>
+              <option value="direct">完全直连</option>
+              <option value="custom">自定义代理</option>
+            </select>
+          </label>
+
+          <label id="proxy-url-row" class="hidden">
+            <span>代理地址</span>
+            <input id="proxy-url" placeholder="http://127.0.0.1:7890" spellcheck="false" />
+          </label>
+
+          <label>
+            <span>测试文本</span>
+            <textarea id="test-text" rows="4">Translate this sentence into Simplified Chinese: The browser extension cannot reach the provider, but the native client can.</textarea>
+          </label>
+
+          <div class="actions">
+            <button type="button" id="network-button" class="secondary">仅测试网络</button>
+            <button type="submit" id="translate-button" class="primary">测试真实翻译</button>
+          </div>
+          <p class="hint">基础测试即使返回 401，也表示 DNS、TLS 和 HTTP 链路已经连通。</p>
+        </form>
+
+        <section class="panel report-panel" aria-live="polite">
+          <div class="section-title">
+            <span>诊断报告</span>
+            <button id="copy-button" type="button" class="text-button" disabled>复制报告</button>
+          </div>
+
+          <div id="empty-state" class="empty-state">
+            <div class="pulse"><span></span><span></span></div>
+            <h2>等待测试</h2>
+            <p>建议先运行“仅测试网络”，再测试真实翻译。</p>
+          </div>
+
+          <div id="loading-state" class="loading-state hidden">
+            <div class="spinner"></div>
+            <h2>Rust 正在连接 DeepSeek</h2>
+            <p id="loading-label">解析 DNS、建立 TLS 并等待 HTTP 响应…</p>
+          </div>
+
+          <div id="report" class="report hidden">
+            <div id="verdict" class="verdict"></div>
+            <div class="metrics">
+              <div><span>HTTP</span><strong id="http-status">—</strong></div>
+              <div><span>耗时</span><strong id="elapsed">—</strong></div>
+              <div><span>代理</span><strong id="proxy-result">—</strong></div>
+            </div>
+            <dl>
+              <div><dt>请求地址</dt><dd id="endpoint"></dd></div>
+              <div><dt>DNS 地址</dt><dd id="dns"></dd></div>
+              <div><dt>结论</dt><dd id="conclusion"></dd></div>
+            </dl>
+            <div class="response-block">
+              <span>HTTP 响应 / 错误链</span>
+              <pre id="response"></pre>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <footer>流译本地诊断器不会保存 API Key。关闭窗口后 Key 即被清除。</footer>
+    </main>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

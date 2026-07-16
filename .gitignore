@@ -8,3 +8,5 @@ dist/
 .pnpm-store/
 outputs/
 work/
+desktop-tester/src-tauri/target*/
+desktop-tester/src-tauri/gen/

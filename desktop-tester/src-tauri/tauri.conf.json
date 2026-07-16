@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "流译 DeepSeek 诊断器",
+  "version": "0.1.5",
+  "identifier": "com.w1ght.liuyi.deepseek-diagnostic",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "流译 DeepSeek 诊断器",
+        "width": 1080,
+        "height": 790,
+        "minWidth": 780,
+        "minHeight": 680,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'none'; img-src 'self' data:; style-src 'self'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "shortDescription": "独立测试 DeepSeek DNS、TLS、代理和 API 请求",
+    "longDescription": "流译的独立 DeepSeek 连通性诊断客户端。Rust 直接发送请求，不经过 Chrome 扩展网络层。"
+  }
+}
