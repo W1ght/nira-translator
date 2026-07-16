@@ -9,6 +9,7 @@ import {
   type OverlayPanel,
 } from './SelectionOverlay';
 import selectionCss from './selection.css?inline';
+import { selectionErrorState } from './selection-errors';
 
 const MAX_SELECTION_CHARACTERS = 16_000;
 
@@ -168,7 +169,7 @@ export class SelectionController {
       const runtimeError = error as RuntimeError;
       this.panel = {
         status: 'error',
-        message: userFacingError(runtimeError.payload, runtimeError.message),
+        ...selectionErrorState(runtimeError.payload, runtimeError.message),
       };
       this.anchor = positionOverlay(this.snapshot.rect, 'error');
     } finally {
@@ -206,6 +207,7 @@ export class SelectionController {
         onTranslate={() => void this.translateSnapshot()}
         onClose={this.close}
         onRetry={() => void this.translateSnapshot()}
+        onReload={() => window.location.reload()}
       />,
     );
   }
@@ -237,19 +239,19 @@ function readSelection(): SelectionSnapshot | null {
 
 function positionOverlay(rect: DOMRect, status: OverlayPanel['status']): OverlayAnchor {
   const margin = 12;
-  const triggerSize = 36;
-  const panelWidth = Math.min(420, window.innerWidth - margin * 2);
+  const triggerSize = 12;
+  const panelWidth = Math.min(388, window.innerWidth - margin * 2);
   const estimatedHeight = status === 'loading' || status === 'closed' ? 150 : Math.min(380, window.innerHeight * 0.7);
 
-  const preferredTriggerLeft = rect.right + 8;
+  const preferredTriggerLeft = rect.right + 5;
   const triggerLeft = clamp(
     preferredTriggerLeft + triggerSize <= window.innerWidth - margin
       ? preferredTriggerLeft
-      : rect.left - triggerSize - 8,
+      : rect.left - triggerSize - 5,
     margin,
     window.innerWidth - triggerSize - margin,
   );
-  const triggerTop = clamp(rect.bottom + 8, margin, window.innerHeight - triggerSize - margin);
+  const triggerTop = clamp(rect.bottom + 5, margin, window.innerHeight - triggerSize - margin);
 
   const panelLeft = clamp(rect.left, margin, window.innerWidth - panelWidth - margin);
   const below = rect.bottom + 12;
@@ -267,13 +269,4 @@ function clamp(value: number, min: number, max: number): number {
 function resolveTheme(theme: ThemeMode, prefersDark: boolean): 'light' | 'dark' {
   if (theme === 'system') return prefersDark ? 'dark' : 'light';
   return theme;
-}
-
-function userFacingError(payload: TranslationErrorPayload | undefined, fallback: string): string {
-  if (!payload) return fallback || '翻译失败，请稍后重试';
-  if (payload.code === 'NO_PROFILE') return '请先在 Nira translator 设置中选择并配置翻译服务。';
-  if (payload.code === 'AUTH_FAILED') return 'API Key 无效，请检查模型配置。';
-  if (payload.code === 'RATE_LIMITED') return '请求过于频繁，请稍后重试。';
-  if (payload.code === 'PERMISSION_DENIED') return '尚未授权访问该 API 地址。';
-  return payload.message;
 }

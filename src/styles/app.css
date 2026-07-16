@@ -68,6 +68,14 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
+[role="switch"][data-state="checked"] {
+  background: var(--nira-text) !important;
+}
+
+[role="switch"][data-state="checked"] > span {
+  background: var(--nira-page) !important;
+}
+
 ::selection {
   background: rgb(var(--nira-glow) / 0.24);
 }

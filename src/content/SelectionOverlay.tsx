@@ -11,7 +11,7 @@ export type OverlayPanel =
   | { status: 'closed' }
   | { status: 'loading' }
   | { status: 'result'; text: string; sourceText: string }
-  | { status: 'error'; message: string };
+  | { status: 'error'; message: string; action: 'retry' | 'reload' };
 
 export interface SelectionOverlayProps {
   anchor: OverlayAnchor | null;
@@ -22,6 +22,7 @@ export interface SelectionOverlayProps {
   onTranslate: () => void;
   onClose: () => void;
   onRetry: () => void;
+  onReload: () => void;
 }
 
 export function SelectionOverlay({
@@ -33,6 +34,7 @@ export function SelectionOverlay({
   onTranslate,
   onClose,
   onRetry,
+  onReload,
 }: SelectionOverlayProps) {
   const [copied, setCopied] = useState(false);
 
@@ -70,11 +72,13 @@ export function SelectionOverlay({
           style={triggerStyle}
           type="button"
           aria-label="翻译选中文本"
-          title="翻译选中文本"
+          title="悬停翻译选中文本"
           onPointerDown={(event) => event.preventDefault()}
+          onPointerEnter={onTranslate}
+          onFocus={onTranslate}
           onClick={onTranslate}
         >
-          <span aria-hidden="true">译</span>
+          <span aria-hidden="true" />
         </button>
       ) : null}
 
@@ -131,8 +135,12 @@ export function SelectionOverlay({
           {panel.status === 'error' ? (
             <div className="nira-content nira-error">
               <p>{panel.message}</p>
-              <button className="nira-primary-button" type="button" onClick={onRetry}>
-                重试
+              <button
+                className="nira-primary-button"
+                type="button"
+                onClick={panel.action === 'reload' ? onReload : onRetry}
+              >
+                {panel.action === 'reload' ? '刷新页面' : '重试'}
               </button>
             </div>
           ) : null}

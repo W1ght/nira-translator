@@ -1,6 +1,6 @@
 [package]
 name = "nira-deepseek-diagnostic"
-version = "0.2.0"
+version = "0.2.1"
 description = "Native DeepSeek connectivity tester for Nira translator"
 authors = ["W1ght"]
 edition = "2021"

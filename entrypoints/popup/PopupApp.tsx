@@ -23,6 +23,10 @@ import type {
 } from '../../src/types/domain';
 import { applyTheme, watchSystemTheme } from '../../src/ui/theme';
 import { profileIsReady } from '../../src/constants/providers';
+import {
+  isDisconnectedContentScriptError,
+  isExtensionContextInvalidatedError,
+} from '../../src/content/selection-errors';
 
 const EMPTY_STATE: PageTranslationState = {
   enabled: false,
@@ -77,12 +81,12 @@ export function PopupApp() {
         try {
           const response = await browser.tabs.sendMessage(tab.id, { type: 'page:get-state' });
           if (response?.ok && response.state) setPageState(response.state);
-        } catch {
-          setNotice('此页面不支持注入翻译（例如浏览器内置页）');
+        } catch (error) {
+          setNotice(popupErrorMessage(error, '此页面不支持注入翻译（例如浏览器内置页）'));
         }
       }
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : '读取扩展设置失败');
+      setNotice(popupErrorMessage(error, '读取扩展设置失败'));
     } finally {
       setLoading(false);
     }
@@ -128,7 +132,7 @@ export function PopupApp() {
       }
       await sendPage({ type: 'page:set-enabled', enabled });
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : '切换翻译失败');
+      setNotice(popupErrorMessage(error, '切换翻译失败'));
     } finally {
       setBusy(false);
     }
@@ -146,11 +150,11 @@ export function PopupApp() {
   const remembered = settings.autoTranslateHosts.includes(hostname);
 
   return (
-    <main className="w-[352px] min-h-[510px] bg-[var(--nira-page)] px-4 py-4 text-[var(--nira-text)]">
-      <header className="mb-5 flex items-center justify-between">
+    <main className="w-[360px] min-h-[520px] bg-[var(--nira-page)] text-[var(--nira-text)]">
+      <header className="flex h-16 items-center justify-between border-b border-[var(--nira-border)] px-5">
         <div>
-          <h1 className="text-[15px] font-semibold leading-tight">Nira translator</h1>
-          <p className="mt-0.5 text-[11px] text-[var(--nira-muted)]">网页与划词翻译</p>
+          <h1 className="text-[15px] font-semibold leading-none tracking-[-0.02em]">Nira translator</h1>
+          <p className="mt-1.5 text-[10px] text-[var(--nira-muted)]">网页翻译</p>
         </div>
         <Button
           color="secondary"
@@ -167,14 +171,14 @@ export function PopupApp() {
         </Button>
       </header>
 
-      <section className="rounded-2xl border border-[var(--nira-border)] bg-[var(--nira-surface)] p-4 shadow-[0_1px_2px_rgb(0_0_0/0.03)]">
+      <section className="border-b border-[var(--nira-border)] px-5 py-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className={`size-2 rounded-full ${pageState.enabled ? 'bg-[var(--nira-text)]' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
-              <p className="truncate text-sm font-medium">{hostname}</p>
+              <span className={`size-1.5 rounded-full ${pageState.enabled ? 'bg-[var(--nira-text)]' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
+              <p className="truncate text-[13px] font-medium">{hostname}</p>
             </div>
-            <p className="mt-1.5 pl-4 text-xs text-[var(--nira-muted)]">
+            <p className="mt-1.5 pl-3.5 text-[11px] text-[var(--nira-muted)]">
               {pageState.enabled
                 ? `${pageState.translatedCount} 段已翻译${pageState.pendingCount ? ` · ${pageState.pendingCount} 段等待中` : ''}`
                 : '打开后从当前视口开始翻译'}
@@ -186,33 +190,32 @@ export function PopupApp() {
             onCheckedChange={(enabled) => void toggleTranslation(enabled)}
           />
         </div>
+      </section>
 
-        <div className="my-4 h-px bg-[var(--nira-border)]" />
-
-        <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+      <section className="border-b border-[var(--nira-border)] px-5 py-4">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2.5">
           <label className="min-w-0">
-            <span className="mb-1.5 block text-[11px] font-medium text-[var(--nira-muted)]">源语言</span>
-            <div className="flex h-9 items-center rounded-lg bg-[var(--nira-sidebar)] px-3 text-sm">自动检测</div>
+            <span className="mb-1.5 block text-[10px] font-medium text-[var(--nira-muted)]">源语言</span>
+            <div className="flex h-9 items-center rounded-lg border border-[var(--nira-border)] bg-[var(--nira-surface)] px-3 text-[12px]">自动检测</div>
           </label>
-          <ArrowRight className="mb-2 size-4 text-[var(--nira-muted)]" />
+          <ArrowRight className="mb-2.5 size-3.5 text-[var(--nira-muted)]" />
           <label className="min-w-0">
-            <span className="mb-1.5 block text-[11px] font-medium text-[var(--nira-muted)]">目标语言</span>
+            <span className="mb-1.5 block text-[10px] font-medium text-[var(--nira-muted)]">目标语言</span>
             <Select
               value={settings.targetLanguage}
               options={targetOptions}
               size="lg"
-              triggerClassName="!bg-[var(--nira-sidebar)] !border-transparent"
+              triggerClassName="!bg-[var(--nira-surface)] !border-[var(--nira-border)] !text-[12px]"
               onChange={(option) => void updateSettings({ targetLanguage: option.value })}
             />
           </label>
         </div>
 
-        <div className="mt-4">
-          <span className="mb-1.5 block text-[11px] font-medium text-[var(--nira-muted)]">页面显示</span>
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <span className="shrink-0 text-[11px] font-medium">页面显示</span>
           <SegmentedControl
             value={settings.pageDisplayMode}
-            block
-            size="lg"
+            size="md"
             aria-label="页面翻译显示模式"
             onChange={(mode: PageDisplayMode) => {
               void updateSettings({ pageDisplayMode: mode });
@@ -225,17 +228,17 @@ export function PopupApp() {
         </div>
       </section>
 
-      <section className="mt-3 rounded-2xl border border-[var(--nira-border)] bg-[var(--nira-surface)] p-4">
+      <section className="px-5 py-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-medium">翻译模型</p>
-            <p className="mt-1 text-[11px] text-[var(--nira-muted)]">
+            <p className="text-[11px] font-medium">翻译服务</p>
+            <p className="mt-1 text-[10px] text-[var(--nira-muted)]">
               {activeProfile && profileIsReady(activeProfile) ? '服务已就绪' : '需要完成配置'}
             </p>
           </div>
           {activeProfile && profileIsReady(activeProfile) && <CheckCircleFilled className="size-4" />}
         </div>
-        <div className="mt-2">
+        <div className="mt-2.5">
           <Select
             value={settings.activeProfileId ?? ''}
             options={modelOptions}
@@ -244,9 +247,9 @@ export function PopupApp() {
           />
         </div>
 
-        <div className="mt-3 flex items-center justify-between rounded-xl bg-[var(--nira-sidebar)] px-3 py-2.5">
+        <div className="mt-4 flex items-center justify-between border-t border-[var(--nira-border)] pt-4">
           <div>
-            <p className="text-xs font-medium">记住此网站</p>
+            <p className="text-[11px] font-medium">记住此网站</p>
             <p className="mt-0.5 text-[10px] text-[var(--nira-muted)]">下次访问时自动翻译</p>
           </div>
           <Switch
@@ -262,15 +265,26 @@ export function PopupApp() {
       </section>
 
       {notice && (
-        <p className="mt-3 rounded-xl border border-[var(--nira-border)] bg-[var(--nira-selected)] px-3 py-2 text-[11px] leading-relaxed">
+        <p className="border-t border-[var(--nira-border)] bg-[var(--nira-selected)] px-5 py-3 text-[11px] leading-relaxed">
           {notice}
         </p>
       )}
 
-      <footer className="mt-4 flex items-center justify-between px-1 text-[11px] text-[var(--nira-muted)]">
-        <span className="flex items-center gap-1.5"><SelectText className="size-3.5" />划词后点翻译按钮</span>
+      <footer className="flex items-center justify-between border-t border-[var(--nira-border)] px-5 py-3 text-[10px] text-[var(--nira-muted)]">
+        <span className="flex items-center gap-1.5"><SelectText className="size-3.5" />划词后悬停小圆点</span>
         <kbd className="rounded border border-[var(--nira-border)] bg-[var(--nira-sidebar)] px-1.5 py-0.5 font-sans">Alt ⇧ T</kbd>
       </footer>
     </main>
   );
+}
+
+function popupErrorMessage(error: unknown, fallback: string): string {
+  if (isExtensionContextInvalidatedError(error)) {
+    return '扩展已更新，请刷新当前网页后再试。';
+  }
+  const message = error instanceof Error ? error.message : '';
+  if (isDisconnectedContentScriptError(error)) {
+    return '当前网页尚未连接 Nira translator，请刷新网页后再试。';
+  }
+  return message || fallback;
 }
