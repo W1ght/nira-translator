@@ -34,18 +34,3 @@ jobs:
           .output/*-edge.zip
           --verify-tag
           --generate-notes
-
-  desktop-diagnostic:
-    needs: release
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Build and upload Tauri diagnostic client
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: desktop-tester
-          tagName: ${{ github.ref_name }}
-          releaseAssetNamePattern: liuyi-deepseek-diagnostic-[version]-[arch][setup].[ext]

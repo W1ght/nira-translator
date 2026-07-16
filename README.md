@@ -108,7 +108,7 @@ src/
 
 如果扩展提示 `ERR_BLOCKED_BY_CLIENT`，说明请求尚未到达 DeepSeek，Chrome 已在客户端拦截 `api.deepseek.com`。请直接在 Chrome 打开 `https://api.deepseek.com/models`：正常连通时会收到 DeepSeek 的 JSON 鉴权错误；如果浏览器显示“已被屏蔽”，请在广告过滤、隐私、安全、代理或其他翻译扩展中将 `api.deepseek.com` 加入白名单，然后重新加载网页。
 
-仓库同时提供 `desktop-tester/` Tauri 2 原生诊断器。它使用 Rust 直接测试 DNS、TLS、系统代理和 DeepSeek HTTP/API 请求，不经过 Chrome 扩展或 WebView `fetch`。Windows 安装包会随每个 GitHub Release 自动构建。
+仓库同时提供 `desktop-tester/` Tauri 2 原生诊断器源码。它使用 Rust 直接测试 DNS、TLS、系统代理和 DeepSeek HTTP/API 请求，不经过 Chrome 扩展或 WebView `fetch`。Windows 可执行文件和安装包仅在本地构建，不上传 GitHub Release。
 
 ## GitHub 自动构建与更新
 
