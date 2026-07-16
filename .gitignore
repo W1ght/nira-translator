@@ -1,0 +1,10 @@
+node_modules/
+.wxt/
+.output/
+coverage/
+dist/
+*.log
+.DS_Store
+.pnpm-store/
+outputs/
+work/

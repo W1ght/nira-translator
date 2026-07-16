@@ -1,0 +1,63 @@
+name: Chrome Web Store
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: ${{ vars.CWS_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm zip
+      - name: Exchange refresh token
+        id: oauth
+        env:
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          token=$(curl --fail --silent --show-error https://oauth2.googleapis.com/token \
+            --data-urlencode client_id="$CLIENT_ID" \
+            --data-urlencode client_secret="$CLIENT_SECRET" \
+            --data-urlencode refresh_token="$REFRESH_TOKEN" \
+            --data-urlencode grant_type=refresh_token | jq -r .access_token)
+          test -n "$token" && test "$token" != "null"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+      - name: Upload package
+        env:
+          TOKEN: ${{ steps.oauth.outputs.token }}
+          PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+        run: |
+          package=$(find .output -maxdepth 1 -name '*-chrome.zip' -print -quit)
+          test -n "$package"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $TOKEN" \
+            -X POST -T "$package" \
+            "https://chromewebstore.googleapis.com/upload/v2/publishers/$PUBLISHER_ID/items/$EXTENSION_ID:upload"
+      - name: Submit for review and publish
+        env:
+          TOKEN: ${{ steps.oauth.outputs.token }}
+          PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            "https://chromewebstore.googleapis.com/v2/publishers/$PUBLISHER_ID/items/$EXTENSION_ID:publish"

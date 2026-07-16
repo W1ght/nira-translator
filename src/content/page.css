@@ -1,0 +1,46 @@
+[data-liuyi-translation] {
+  box-sizing: border-box !important;
+  display: block !important;
+  margin-block: 0.4em 0.75em !important;
+  padding-inline-start: 0.72em !important;
+  border-inline-start: 2px solid color-mix(in srgb, #0f8f86 54%, transparent) !important;
+  color: inherit !important;
+  font: inherit !important;
+  line-height: inherit !important;
+  letter-spacing: inherit !important;
+  white-space: pre-wrap !important;
+  opacity: 0.9 !important;
+}
+
+[data-liuyi-translation]:is(li) {
+  list-style: none !important;
+}
+
+[data-liuyi-translation][data-liuyi-state="loading"] {
+  min-height: 1.25em !important;
+  color: transparent !important;
+  border-inline-start-color: color-mix(in srgb, #0f8f86 28%, transparent) !important;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, #0f8f86 8%, transparent),
+    color-mix(in srgb, #0f8f86 18%, transparent),
+    color-mix(in srgb, #0f8f86 8%, transparent)
+  ) !important;
+  background-size: 220% 100% !important;
+  animation: liuyi-page-shimmer 1.3s ease-in-out infinite !important;
+}
+
+[data-liuyi-source-hidden] {
+  display: none !important;
+}
+
+@keyframes liuyi-page-shimmer {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-liuyi-translation][data-liuyi-state="loading"] {
+    animation: none !important;
+  }
+}

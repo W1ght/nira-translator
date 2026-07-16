@@ -1,0 +1,35 @@
+{
+  "name": "liuyi-translator",
+  "version": "0.1.3",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "dev": "wxt",
+    "dev:edge": "wxt -b edge",
+    "build": "wxt build",
+    "build:edge": "wxt build -b edge",
+    "zip": "wxt zip",
+    "zip:edge": "wxt zip -b edge",
+    "prepare": "wxt prepare",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@openai/apps-sdk-ui": "0.2.2",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@wxt-dev/module-react": "1.2.2",
+    "jsdom": "^26.1.0",
+    "tailwindcss": "4.3.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18",
+    "wxt": "0.20.27"
+  }
+}
