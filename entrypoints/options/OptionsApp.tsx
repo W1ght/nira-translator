@@ -122,8 +122,12 @@ async function request<T>(message: unknown): Promise<T> {
     }
     if (raw.type === 'profiles:delete') {
       previewProfiles = previewProfiles.filter((profile) => profile.id !== raw.profileId);
+      const fallbackProfileId = previewProfiles[0]?.id ?? null;
       if (previewSettings.activeProfileId === raw.profileId) {
-        previewSettings = { ...previewSettings, activeProfileId: previewProfiles[0]?.id ?? null };
+        previewSettings = { ...previewSettings, activeProfileId: fallbackProfileId };
+      }
+      if (previewSettings.selectionProfileId === raw.profileId) {
+        previewSettings = { ...previewSettings, selectionProfileId: fallbackProfileId };
       }
       return { ok: true, profiles: previewProfiles, settings: previewSettings } as T;
     }
@@ -317,7 +321,7 @@ export function OptionsApp() {
         const modelInfo = result.actualModel ? ` · ${result.actualModel}` : '';
         setStatus(`连接成功 · ${result.durationMs}ms${modelInfo}${result.warning ? ` · ${result.warning}` : ''}`);
       } else {
-        setStatus('配置已保存并设为当前模型');
+        setStatus('配置已保存并设为页面翻译模型');
       }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : '保存失败');
@@ -379,8 +383,14 @@ export function OptionsApp() {
 
   const profileList = useMemo(() => profiles.map((profile) => ({
     ...profile,
-    active: settings.activeProfileId === profile.id,
-  })), [profiles, settings.activeProfileId]);
+    usedByPage: settings.activeProfileId === profile.id,
+    usedBySelection: settings.selectionProfileId === profile.id,
+  })), [profiles, settings.activeProfileId, settings.selectionProfileId]);
+  const profileOptions = useMemo<Option[]>(() => profiles.map((profile) => ({
+    value: profile.id,
+    label: profile.name,
+    description: profile.model || getProviderDefinition(profile.preset).description,
+  })), [profiles]);
 
   return (
     <div className="nira-shell min-h-screen bg-[var(--nira-page)] text-[var(--nira-text)]">
@@ -459,7 +469,8 @@ export function OptionsApp() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="truncate text-sm font-medium">{profile.name}</span>
-                            {profile.active && <span className="text-[10px] text-[var(--nira-muted)]">当前</span>}
+                            {profile.usedByPage && <span className="text-[10px] text-[var(--nira-muted)]">页面</span>}
+                            {profile.usedBySelection && <span className="text-[10px] text-[var(--nira-muted)]">划词</span>}
                           </div>
                           <p className="mt-1 truncate text-[11px] text-[var(--nira-muted)]">{getProviderDefinition(profile.preset).description}</p>
                         </div>
@@ -606,6 +617,9 @@ export function OptionsApp() {
             <>
               <SectionHeader title="页面翻译" description="从视口附近开始按需翻译，滚动到新内容时再继续请求，减少等待和模型用量。" />
               <section className="rounded-2xl border border-[var(--nira-border)] bg-[var(--nira-surface)] px-6">
+                <SettingRow title="页面翻译模型" description="只用于整页翻译，不影响划词翻译选择的服务。">
+                  <Select value={settings.activeProfileId ?? ''} options={profileOptions} placeholder="选择页面翻译模型" onChange={(option) => void updateSettings({ activeProfileId: option.value })} />
+                </SettingRow>
                 <SettingRow title="源语言" description="通常保持自动检测；特殊内容可手动指定语言。">
                   <Select value={settings.sourceLanguage} options={SOURCE_LANGUAGES} onChange={(option) => void updateSettings({ sourceLanguage: option.value })} />
                 </SettingRow>
@@ -622,6 +636,9 @@ export function OptionsApp() {
                     <SegmentedControl.Option value="dual">双语对照</SegmentedControl.Option>
                     <SegmentedControl.Option value="translation">仅译文</SegmentedControl.Option>
                   </SegmentedControl>
+                </SettingRow>
+                <SettingRow title="显示页面翻译悬浮球" description="固定在网页右下角，单击即可开启或关闭整页翻译。">
+                  <div className="flex justify-end"><Switch checked={settings.pageFloatingBallEnabled} onCheckedChange={(checked) => void updateSettings({ pageFloatingBallEnabled: checked })} /></div>
                 </SettingRow>
                 <SettingRow title="会话缓存" description="译文只保存在本次浏览器会话中，关闭浏览器后自动清理。">
                   <Button
@@ -642,6 +659,9 @@ export function OptionsApp() {
             <>
               <SectionHeader title="划词翻译" description="选中文本后显示一个小型翻译按钮；结果面板使用与主界面一致的黑白样式。" />
               <section className="rounded-2xl border border-[var(--nira-border)] bg-[var(--nira-surface)] px-6">
+                <SettingRow title="划词翻译模型" description="独立于页面翻译，可选择更快或更适合短文本的服务。">
+                  <Select value={settings.selectionProfileId ?? ''} options={profileOptions} placeholder="选择划词翻译模型" onChange={(option) => void updateSettings({ selectionProfileId: option.value })} />
+                </SettingRow>
                 <SettingRow title="显示划词按钮" description="关闭后仍可用 Alt + Shift + T 翻译当前选区。">
                   <div className="flex justify-end"><Switch checked={settings.selectionButtonEnabled} onCheckedChange={(checked) => void updateSettings({ selectionButtonEnabled: checked })} /></div>
                 </SettingRow>

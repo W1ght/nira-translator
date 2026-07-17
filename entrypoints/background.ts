@@ -324,8 +324,8 @@ function validateTranslationLimits(request: TranslationRequest): void {
 }
 
 function assertContentScript(sender: MessageSenderLike): void {
-  if (!sender.tab?.id || sender.frameId !== 0) {
-    throw createTranslationError('PERMISSION_DENIED', '此操作只允许当前网页的主框架调用', false);
+  if (sender.tab?.id == null || sender.frameId == null || sender.frameId < 0) {
+    throw createTranslationError('PERMISSION_DENIED', '此操作只允许网页内容脚本调用', false);
   }
 }
 
@@ -337,7 +337,7 @@ function assertExtensionPage(sender: MessageSenderLike): void {
 }
 
 function jobKey(sender: MessageSenderLike, jobId: string): string {
-  return `${sender.tab?.id ?? 'extension'}:${sender.documentId ?? 'document'}:${jobId}`;
+  return `${sender.tab?.id ?? 'extension'}:${sender.frameId ?? 'frame'}:${sender.documentId ?? 'document'}:${jobId}`;
 }
 
 function isTranslationRequest(value: unknown): value is TranslationRequest {
@@ -391,10 +391,16 @@ function sanitizeSettingsPatch(patch: Partial<ExtensionSettings>): Partial<Exten
   if (typeof patch.activeProfileId === 'string' || patch.activeProfileId === null) {
     result.activeProfileId = patch.activeProfileId;
   }
+  if (typeof patch.selectionProfileId === 'string' || patch.selectionProfileId === null) {
+    result.selectionProfileId = patch.selectionProfileId;
+  }
   if (Array.isArray(patch.autoTranslateHosts)) {
     result.autoTranslateHosts = patch.autoTranslateHosts
       .filter((host): host is string => typeof host === 'string')
       .slice(0, 500);
+  }
+  if (typeof patch.pageFloatingBallEnabled === 'boolean') {
+    result.pageFloatingBallEnabled = patch.pageFloatingBallEnabled;
   }
   if (typeof patch.selectionButtonEnabled === 'boolean') {
     result.selectionButtonEnabled = patch.selectionButtonEnabled;

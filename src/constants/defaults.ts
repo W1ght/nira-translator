@@ -7,7 +7,9 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   targetLanguage: 'zh-CN',
   pageDisplayMode: 'dual',
   activeProfileId: 'openai-default',
+  selectionProfileId: 'openai-default',
   autoTranslateHosts: [],
+  pageFloatingBallEnabled: true,
   selectionButtonEnabled: true,
 };
 

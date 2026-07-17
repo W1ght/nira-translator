@@ -88,7 +88,13 @@ export async function getSettings(): Promise<ExtensionSettings> {
     STORAGE_KEYS.settings,
     DEFAULT_SETTINGS,
   );
-  return { ...DEFAULT_SETTINGS, ...stored };
+  return {
+    ...DEFAULT_SETTINGS,
+    ...stored,
+    selectionProfileId: Object.prototype.hasOwnProperty.call(stored, 'selectionProfileId')
+      ? stored.selectionProfileId ?? null
+      : stored.activeProfileId ?? DEFAULT_SETTINGS.selectionProfileId,
+  };
 }
 
 export async function updateSettings(
@@ -207,9 +213,12 @@ export async function deleteProfile(profileId: string): Promise<PublicModelProfi
   const nextProfiles = profiles.filter((profile) => profile.id !== profileId);
   const nextCredentials = { ...credentials };
   delete nextCredentials[profileId];
-  const nextSettings = settings.activeProfileId === profileId
-    ? { ...settings, activeProfileId: nextProfiles[0]?.id ?? null }
-    : settings;
+  const fallbackProfileId = nextProfiles[0]?.id ?? null;
+  const nextSettings = {
+    ...settings,
+    ...(settings.activeProfileId === profileId ? { activeProfileId: fallbackProfileId } : {}),
+    ...(settings.selectionProfileId === profileId ? { selectionProfileId: fallbackProfileId } : {}),
+  };
 
   await browser.storage.local.set({
     [STORAGE_KEYS.profiles]: nextProfiles,

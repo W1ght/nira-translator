@@ -1,7 +1,12 @@
 import { createRoot, type Root } from 'react-dom/client';
 
 import { languageLabel } from '../constants/languages';
-import type { ExtensionSettings, ThemeMode, TranslationErrorPayload } from '../types/domain';
+import type {
+  ExtensionSettings,
+  ThemeMode,
+  TranslationErrorPayload,
+  TranslationRequest,
+} from '../types/domain';
 import { createJobId, requestTranslation, cancelTranslation } from './messaging';
 import {
   SelectionOverlay,
@@ -151,13 +156,9 @@ export class SelectionController {
     this.render();
 
     try {
-      const result = await requestTranslation({
-        jobId,
-        kind: 'selection',
-        sourceLanguage: this.settings.sourceLanguage,
-        targetLanguage: this.settings.targetLanguage,
-        segments: [{ id: 'selection-0', text: sourceText }],
-      });
+      const result = await requestTranslation(
+        createSelectionTranslationRequest(this.settings, jobId, sourceText),
+      );
 
       if (generation !== this.requestGeneration) return;
       const translation = result.translations.find((item) => item.id === 'selection-0')?.text;
@@ -211,6 +212,21 @@ export class SelectionController {
       />,
     );
   }
+}
+
+export function createSelectionTranslationRequest(
+  settings: ExtensionSettings,
+  jobId: string,
+  sourceText: string,
+): TranslationRequest {
+  return {
+    jobId,
+    kind: 'selection',
+    sourceLanguage: settings.sourceLanguage,
+    targetLanguage: settings.targetLanguage,
+    segments: [{ id: 'selection-0', text: sourceText }],
+    ...(settings.selectionProfileId ? { profileId: settings.selectionProfileId } : {}),
+  };
 }
 
 function readSelection(): SelectionSnapshot | null {

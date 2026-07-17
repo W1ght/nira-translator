@@ -12,6 +12,7 @@ const now = Date.now();
 export const PREVIEW_SETTINGS: ExtensionSettings = {
   ...DEFAULT_SETTINGS,
   activeProfileId: 'deepseek-default',
+  selectionProfileId: 'openai-default',
 };
 
 export const PREVIEW_PROFILES: PublicModelProfile[] = DEFAULT_PROFILES.map((profile) => ({

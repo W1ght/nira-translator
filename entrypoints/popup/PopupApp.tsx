@@ -79,7 +79,11 @@ export function PopupApp() {
           }
         }
         try {
-          const response = await browser.tabs.sendMessage(tab.id, { type: 'page:get-state' });
+          const response = await browser.tabs.sendMessage(
+            tab.id,
+            { type: 'page:get-state' },
+            { frameId: 0 },
+          );
           if (response?.ok && response.state) setPageState(response.state);
         } catch (error) {
           setNotice(popupErrorMessage(error, '此页面不支持注入翻译（例如浏览器内置页）'));
@@ -119,7 +123,12 @@ export function PopupApp() {
     if (tabId == null) throw new Error('找不到当前标签页');
     const response = await browser.tabs.sendMessage(tabId, message);
     if (!response?.ok) throw new Error(response?.error?.message ?? '网页端没有响应');
-    if (response.state) setPageState(response.state);
+    const topFrame = await browser.tabs.sendMessage(
+      tabId,
+      { type: 'page:get-state' },
+      { frameId: 0 },
+    );
+    if (topFrame?.ok && topFrame.state) setPageState(topFrame.state);
   };
 
   const toggleTranslation = async (enabled: boolean) => {
@@ -147,6 +156,7 @@ export function PopupApp() {
     .filter((language) => language.code !== 'auto')
     .map((language) => ({ value: language.code, label: language.label })), []);
   const activeProfile = profiles.find((profile) => profile.id === settings.activeProfileId);
+  const selectionProfile = profiles.find((profile) => profile.id === settings.selectionProfileId);
   const remembered = settings.autoTranslateHosts.includes(hostname);
 
   return (
@@ -226,12 +236,22 @@ export function PopupApp() {
             <SegmentedControl.Option value="translation">仅译文</SegmentedControl.Option>
           </SegmentedControl>
         </div>
+        <div className="mt-4 flex items-center justify-between gap-4 border-t border-[var(--nira-border)] pt-4">
+          <div>
+            <p className="text-[11px] font-medium">页面翻译悬浮球</p>
+            <p className="mt-0.5 text-[10px] text-[var(--nira-muted)]">显示在网页右下角</p>
+          </div>
+          <Switch
+            checked={settings.pageFloatingBallEnabled}
+            onCheckedChange={(checked) => void updateSettings({ pageFloatingBallEnabled: checked })}
+          />
+        </div>
       </section>
 
       <section className="px-5 py-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] font-medium">翻译服务</p>
+            <p className="text-[11px] font-medium">页面翻译服务</p>
             <p className="mt-1 text-[10px] text-[var(--nira-muted)]">
               {activeProfile && profileIsReady(activeProfile) ? '服务已就绪' : '需要完成配置'}
             </p>
@@ -244,6 +264,24 @@ export function PopupApp() {
             options={modelOptions}
             placeholder="选择模型"
             onChange={(option) => void updateSettings({ activeProfileId: option.value })}
+          />
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--nira-border)] pt-4">
+          <div>
+            <p className="text-[11px] font-medium">划词翻译服务</p>
+            <p className="mt-1 text-[10px] text-[var(--nira-muted)]">
+              {selectionProfile && profileIsReady(selectionProfile) ? '独立服务已就绪' : '需要完成配置'}
+            </p>
+          </div>
+          {selectionProfile && profileIsReady(selectionProfile) && <CheckCircleFilled className="size-4" />}
+        </div>
+        <div className="mt-2.5">
+          <Select
+            value={settings.selectionProfileId ?? ''}
+            options={modelOptions}
+            placeholder="选择划词模型"
+            onChange={(option) => void updateSettings({ selectionProfileId: option.value })}
           />
         </div>
 

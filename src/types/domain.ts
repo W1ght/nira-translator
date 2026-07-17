@@ -80,7 +80,9 @@ export interface ExtensionSettings {
   targetLanguage: string;
   pageDisplayMode: PageDisplayMode;
   activeProfileId: string | null;
+  selectionProfileId: string | null;
   autoTranslateHosts: string[];
+  pageFloatingBallEnabled: boolean;
   selectionButtonEnabled: boolean;
 }
 

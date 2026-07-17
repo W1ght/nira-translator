@@ -1,42 +1,74 @@
 [data-nira-translation] {
   box-sizing: border-box !important;
-  display: block !important;
-  margin-block: 0.4em 0.75em !important;
-  padding-inline-start: 0.72em !important;
-  border-inline-start: 2px solid color-mix(in srgb, currentColor 38%, transparent) !important;
+  max-width: 100% !important;
   color: inherit !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  font-style: inherit;
+  font-variant: inherit;
+  font-weight: inherit;
+  line-height: inherit !important;
+  letter-spacing: inherit !important;
+  text-align: inherit !important;
+  text-indent: 0 !important;
+  text-transform: none !important;
+  overflow-wrap: anywhere !important;
+  cursor: text !important;
+  pointer-events: auto !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -webkit-touch-callout: default !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+[data-nira-translation][data-nira-display="block"] {
+  display: block !important;
+  width: auto !important;
+  margin-block: 0.38em 0.56em !important;
+  white-space: normal !important;
+}
+
+[data-nira-translation][data-nira-display="inline"] {
+  display: inline !important;
+  margin-inline-start: 0.38em !important;
+  white-space: normal !important;
+}
+
+[data-nira-translation-inner] {
+  color: inherit !important;
+  background: transparent !important;
   font: inherit !important;
   line-height: inherit !important;
   letter-spacing: inherit !important;
-  white-space: pre-wrap !important;
-  opacity: 0.9 !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -webkit-text-fill-color: currentColor !important;
 }
 
-[data-nira-translation]:is(li) {
-  list-style: none !important;
+[data-nira-translation] br {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+[data-nira-translation]::selection,
+[data-nira-translation] *::selection {
+  color: HighlightText !important;
+  background: Highlight !important;
 }
 
 [data-nira-translation][data-nira-state="loading"] {
-  min-height: 1.25em !important;
-  color: transparent !important;
-  border-inline-start-color: color-mix(in srgb, currentColor 24%, transparent) !important;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, currentColor 4%, transparent),
-    color-mix(in srgb, currentColor 10%, transparent),
-    color-mix(in srgb, currentColor 4%, transparent)
-  ) !important;
-  background-size: 220% 100% !important;
-  animation: nira-page-shimmer 1.3s ease-in-out infinite !important;
+  opacity: 0.42 !important;
+  animation: nira-page-pulse 1.2s ease-in-out infinite !important;
 }
 
-[data-nira-source-hidden] {
-  display: none !important;
+[data-nira-translation][data-nira-preformatted] {
+  white-space: pre-wrap !important;
 }
 
-@keyframes nira-page-shimmer {
-  from { background-position: 120% 0; }
-  to { background-position: -120% 0; }
+@keyframes nira-page-pulse {
+  0%, 100% { opacity: 0.32; }
+  50% { opacity: 0.58; }
 }
 
 @media (prefers-reduced-motion: reduce) {

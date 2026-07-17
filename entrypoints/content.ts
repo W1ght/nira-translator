@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS } from '../src/constants/defaults';
 import type { ExtensionSettings, PageDisplayMode } from '../src/types/domain';
 import { getSettings } from '../src/content/messaging';
 import pageCss from '../src/content/page.css?inline';
+import { PageFloatingBall } from '../src/content/page-floating-ball';
 import { PageTranslator } from '../src/content/page-translator';
 import { SelectionController } from '../src/content/selection-controller';
 
@@ -17,6 +18,9 @@ type ContentMessage =
 
 export default defineContentScript({
   matches: ['<all_urls>'],
+  allFrames: true,
+  matchAboutBlank: true,
+  matchOriginAsFallback: true,
   runAt: 'document_idle',
   async main() {
     await waitForBody();
@@ -28,6 +32,20 @@ export default defineContentScript({
 
     if (shouldAutoTranslate(settings)) pageTranslator.setEnabled(true);
 
+    let pageFloatingBall: PageFloatingBall | null = null;
+    const setPageEnabled = (enabled: boolean) => {
+      const state = pageTranslator.setEnabled(enabled);
+      pageFloatingBall?.updateState(state);
+      return state;
+    };
+    if (window === window.top) {
+      pageFloatingBall = new PageFloatingBall(
+        settings,
+        pageTranslator.getState(),
+        () => setPageEnabled(!pageTranslator.isEnabled()),
+      );
+    }
+
     const onMessage = (rawMessage: unknown): Promise<unknown> | undefined => {
       if (!isContentMessage(rawMessage)) return undefined;
 
@@ -37,19 +55,21 @@ export default defineContentScript({
         case 'page:set-enabled':
           return Promise.resolve({
             ok: true,
-            state: pageTranslator.setEnabled(rawMessage.enabled),
+            state: setPageEnabled(rawMessage.enabled),
           });
         case 'page:toggle':
           return Promise.resolve({
             ok: true,
-            state: pageTranslator.setEnabled(!pageTranslator.isEnabled()),
+            state: setPageEnabled(!pageTranslator.isEnabled()),
           });
         case 'page:set-mode':
           settings = { ...settings, pageDisplayMode: rawMessage.mode };
           selectionController.updateSettings(settings);
+          const state = pageTranslator.setMode(rawMessage.mode);
+          pageFloatingBall?.update(settings, state);
           return Promise.resolve({
             ok: true,
-            state: pageTranslator.setMode(rawMessage.mode),
+            state,
           });
         case 'selection:translate-current':
           return selectionController.translateCurrentSelection().then(() => ({ ok: true }));
@@ -59,8 +79,9 @@ export default defineContentScript({
           pageTranslator.updateSettings(settings);
           selectionController.updateSettings(settings);
           const isAutoEnabled = shouldAutoTranslate(settings);
-          if (isAutoEnabled && !pageTranslator.isEnabled()) pageTranslator.setEnabled(true);
-          if (!isAutoEnabled && wasAutoEnabled && pageTranslator.isEnabled()) pageTranslator.setEnabled(false);
+          if (isAutoEnabled && !pageTranslator.isEnabled()) setPageEnabled(true);
+          if (!isAutoEnabled && wasAutoEnabled && pageTranslator.isEnabled()) setPageEnabled(false);
+          pageFloatingBall?.update(settings, pageTranslator.getState());
           return Promise.resolve({ ok: true });
         }
       }
@@ -72,6 +93,7 @@ export default defineContentScript({
       browser.runtime.onMessage.removeListener(onMessage);
       pageTranslator.destroy();
       selectionController.destroy();
+      pageFloatingBall?.destroy();
       pageStyle.remove();
     };
 
@@ -88,10 +110,19 @@ function installPageStyle(): HTMLStyleElement {
 }
 
 function shouldAutoTranslate(settings: ExtensionSettings): boolean {
+  const pageLocations = new Set([location.hostname.toLowerCase(), location.origin.toLowerCase()]);
+  if (document.referrer) {
+    try {
+      const referrer = new URL(document.referrer);
+      pageLocations.add(referrer.hostname.toLowerCase());
+      pageLocations.add(referrer.origin.toLowerCase());
+    } catch {
+      // Invalid or opaque referrers do not participate in host matching.
+    }
+  }
   return settings.autoTranslateHosts.some((host) => {
     const normalized = host.trim().toLowerCase();
-    return normalized === location.hostname.toLowerCase()
-      || normalized === location.origin.toLowerCase();
+    return pageLocations.has(normalized);
   });
 }
 
